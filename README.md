@@ -10,7 +10,7 @@ Set it in `crater.json` of your project (new projects from `crater init` already
 
 ```json
 {
-  "registry": "github:TheExeDEV/crater-registry"
+  "registry": "https://github.com/TheExeDEV/crater-registry"
 }
 ```
 
