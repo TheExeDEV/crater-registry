@@ -6,11 +6,11 @@ Browse packages: https://theexedev.github.io/crater-registry/
 
 ## Use this registry
 
-Add it to `crater.config.json` in your project, or to your global config:
+Set it in `crater.json` of your project (new projects from `crater init` already have it):
 
 ```json
 {
-  "registry": "github:TheExeDEV/crater-registry"
+  "registry": "https://raw.githubusercontent.com/TheExeDEV/crater-registry/main"
 }
 ```
 
