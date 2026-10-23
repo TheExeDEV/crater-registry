@@ -1,0 +1,36 @@
+{
+  "name": "ifmnb/funny-core",
+  "versions": [
+    {
+      "version": "0.1.0",
+      "sha256": "bec6893c45761422f7556749c0dc9329e92b4f819fe96e1641f6269d24a30c9e",
+      "published_at": "2026-10-23T20:27:56.765671+00:00",
+      "manifest": {
+        "name": "ifmnb/funny-core",
+        "authors": [
+          "IFMNB",
+          "TheExeDEV"
+        ],
+        "description": "The core for designing open source roblox games",
+        "license": "MPLv2",
+        "version": "0.1.0",
+        "keywords": [
+          "core",
+          "library",
+          "foundation"
+        ],
+        "registry": "github:TheExeDEV/crater-registry",
+        "repository": "https://github.com/FunnyDevz/funny-core",
+        "can_publish": true,
+        "import_to": "shared",
+        "path_to_main": "",
+        "path_to_definition_files": [],
+        "path_to_definition_file": "core.d.luau",
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "scripts": {}
+      }
+    }
+  ]
+}
