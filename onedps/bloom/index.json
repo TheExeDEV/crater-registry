@@ -1,0 +1,42 @@
+{
+  "name": "onedps/bloom",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "sha256": "36f1d1925567171a513633a0c7cfdfb23ca1d7cd685d25d1a479e13876076bfa",
+      "published_at": "2026-10-24T13:53:43.1705988+00:00",
+      "manifest": {
+        "name": "onedps/bloom",
+        "authors": [
+          "onedps",
+          "TheExeDEV"
+        ],
+        "description": "Blossom with possibilities. Predictable API, high performance, and no limitations.",
+        "license": "Apache 2.0",
+        "version": "1.0.0",
+        "keywords": [
+          "EditableImage",
+          "buffer",
+          "Bloom",
+          "FrameBuffer",
+          "onedps",
+          "TheExeDEV"
+        ],
+        "registry": "https://github.com/TheExeDEV/crater-registry",
+        "repository": "https://github.com/FrameBuffer-Studio/Bloom/",
+        "can_publish": true,
+        "import_to": "shared",
+        "path_to_main": "src/init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "scripts": {},
+        "exclude": [
+          "docs/"
+        ]
+      },
+      "scripts": []
+    }
+  ]
+}
