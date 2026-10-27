@@ -8,50 +8,24 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: publish
-  cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build site
+  site:
+    name: Rebuild the website
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Build crater
+      - name: Ask the website to rebuild
+        env:
+          TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
         run: |
-          git clone --depth 1 https://github.com/TheExeDEV/crater.git "$RUNNER_TEMP/crater"
-          dotnet publish "$RUNNER_TEMP/crater/src/Crater" --configuration Release --output "$RUNNER_TEMP/crater-bin"
+          if [ -z "$TOKEN" ]; then
+            echo "SITE_DISPATCH_TOKEN is not set, the website rebuilds once a day."
+            exit 0
+          fi
 
-      - name: Build site
-        run: dotnet "$RUNNER_TEMP/crater-bin/crater.dll" registry site . --output _site
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-  deploy:
-    name: Deploy site
-    needs: build
-    runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          curl --fail --silent --show-error -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/TheExeDEV/crater-stats/dispatches \
+            -d '{"event_type":"registry-updated"}'

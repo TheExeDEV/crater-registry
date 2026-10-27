@@ -2,10 +2,10 @@
   "name": "Crater Registry",
   "description": "Luau and Roblox packages for crater",
   "url": "https://raw.githubusercontent.com/TheExeDEV/crater-registry/main",
-  "site_url": "https://theexedev.github.io/crater-registry/",
+  "site_url": "https://registry.crater-dev.workers.dev/",
   "repository": "TheExeDEV/crater-registry",
   "maintainers": [
     "TheExeDEV"
   ],
-  "stats_url": "https://stats.crater-dev.workers.dev"
+  "stats_url": "https://registry.crater-dev.workers.dev/api"
 }

@@ -2,7 +2,7 @@
 
 A package registry for [crater](https://github.com/TheExeDEV/crater), the package manager for Luau and Roblox.
 
-Browse packages: https://theexedev.github.io/crater-registry/
+Browse packages: https://registry.crater-dev.workers.dev/
 
 ## Use this registry
 
