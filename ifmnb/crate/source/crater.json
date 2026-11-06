@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json",
 
   "name": "ifmnb/crate",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Runtime for emulating objects based on userdata",
   "authors": ["IFMNB"],
   "license": "MPLv2",
