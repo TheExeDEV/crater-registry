@@ -31,6 +31,25 @@ export type crate = {
     ]==]
 	_parent: any?,
 
+    --[==[
+        Allows to search for fields in the parent if the child does not have them.
+    ]==]
+    _index_relative_to_parent: boolean,
+    --[==[
+        Allows to write fields based on the parent's opinion
+    ]==]
+    _newindex_relative_to_parent: boolean,
+
+    --[==[
+        Allows to iterate over parent fields
+    ]==]
+    _iter_relative_to_parent: boolean,
+
+    --[==[
+        Fields that are not in readable and in this field will not pass through __iter
+    ]==]
+    read _iterateable: {string},
+
 	--[==[
         The userdata proxy (`newproxy(true)`). This is the face handed
         out to untrusted code. Every `__index` / `__newindex` /
@@ -212,9 +231,14 @@ do
         crate_._instance = instance
         crate_._readable = {}
         crate_._fields = {}
+        crate_._iterateable = {}
         crate_._writeable = {}
 
         const crate : crate = crate_ :: any
+
+        crate._index_relative_to_parent = false
+        crate._newindex_relative_to_parent = false
+
         private.crates:set(instance, crate)
 
         return crate
@@ -257,6 +281,10 @@ do
                 return search._fields[index]
             end
 
+            if not search._index_relative_to_parent then
+                break
+            end
+
             search = private.crates:get(search._parent)
         end
 
@@ -281,12 +309,20 @@ do
 				if not seen[key] then
 					seen[key] = true
 
+                    if not table.find(search._iterateable, key) then
+                        continue
+                    end
+
 					local value = search._fields[key]
 					if value ~= nil then
 						visible[key] = value
 					end
 				end
 			end
+
+            if not search._iter_relative_to_parent then
+                break
+            end
 
 			search = private.crates:get(search._parent)
 		end
@@ -302,6 +338,10 @@ do
             if (table.find(search._writeable, index)) then
                 search._fields[index] = value
                 return
+            end
+
+            if not search._newindex_relative_to_parent then
+                break
             end
 
             search = private.crates:get(search._parent)
