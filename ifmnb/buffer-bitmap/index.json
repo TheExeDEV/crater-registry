@@ -1,0 +1,51 @@
+{
+  "name": "ifmnb/buffer-bitmap",
+  "versions": [
+    {
+      "version": "0.0.1",
+      "sha256": "5408c348a34eb1b43cb79704c9065a4e122be113c2ca565de300a3b2a3f5bc95",
+      "published_at": "2026-11-06T20:32:17.4493533+00:00",
+      "manifest": {
+        "name": "ifmnb/buffer-bitmap",
+        "authors": [
+          "IFMNB"
+        ],
+        "description": "A buffer-based bitmap",
+        "license": "MPLv2",
+        "version": "0.0.1",
+        "keywords": [
+          "bitmap",
+          "universal",
+          "buffer"
+        ],
+        "registry": "crater",
+        "repository": "https://github.com/IFMNB/luau-math",
+        "can_publish": true,
+        "registries": {},
+        "import_to": "shared",
+        "path_to_main": "init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "overrides": [],
+        "workspace": [],
+        "scripts": {},
+        "tools": {},
+        "package_scripts": {
+          "block": false,
+          "allow": []
+        },
+        "package_files": {
+          "exclude": [],
+          "allow": []
+        },
+        "monorepository-elements": {},
+        "interface": false,
+        "realized_interfaces": [],
+        "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
+      },
+      "scripts": []
+    }
+  ]
+}
