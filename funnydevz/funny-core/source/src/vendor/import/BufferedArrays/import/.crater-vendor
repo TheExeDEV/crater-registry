@@ -1,0 +1,6 @@
+{
+  "realm": "client",
+  "packages": [
+    "ifmnb/buffer-bitmap@0.0.1"
+  ]
+}

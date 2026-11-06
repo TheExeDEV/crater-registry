@@ -1,0 +1,10 @@
+{
+  "name": "ifmnb/crate",
+  "version": "0.0.1",
+  "description": "Runtime for emulating objects based on userdata",
+  "license": "MPLv2",
+  "source": "crater",
+  "import_client": [],
+  "import_server": [],
+  "definition_files": []
+}
