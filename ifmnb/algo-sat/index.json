@@ -1,0 +1,52 @@
+{
+  "name": "ifmnb/algo-sat",
+  "versions": [
+    {
+      "version": "0.0.1",
+      "sha256": "98dfd17325a9d4afeb5c04ad1c76d4ef61064596517ee970f80596e87e823ec0",
+      "published_at": "2026-11-06T19:26:25.6009745+00:00",
+      "manifest": {
+        "name": "ifmnb/algo-sat",
+        "authors": [
+          "IFMNB"
+        ],
+        "description": "The algorithm of Separating Axis Theorem",
+        "license": "MPLv2",
+        "version": "0.0.1",
+        "keywords": [
+          "algorithm",
+          "sat",
+          "geometry",
+          "universal"
+        ],
+        "registry": "crater",
+        "repository": "https://github.com/IFMNB/luau-algorithm",
+        "can_publish": true,
+        "registries": {},
+        "import_to": "shared",
+        "path_to_main": "init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "overrides": [],
+        "workspace": [],
+        "scripts": {},
+        "tools": {},
+        "package_scripts": {
+          "block": false,
+          "allow": []
+        },
+        "package_files": {
+          "exclude": [],
+          "allow": []
+        },
+        "monorepository-elements": {},
+        "interface": false,
+        "realized_interfaces": [],
+        "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
+      },
+      "scripts": []
+    }
+  ]
+}
