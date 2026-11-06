@@ -1,0 +1,10 @@
+{
+  "name": "ifmnb/quat",
+  "version": "0.0.1",
+  "description": "A half-cropped quaternion based on a vector without the w part.",
+  "license": "MPLv2",
+  "source": "crater",
+  "import_client": [],
+  "import_server": [],
+  "definition_files": []
+}

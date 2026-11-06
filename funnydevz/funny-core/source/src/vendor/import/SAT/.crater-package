@@ -1,0 +1,10 @@
+{
+  "name": "ifmnb/algo-sat",
+  "version": "0.0.1",
+  "description": "The algorithm of Separating Axis Theorem",
+  "license": "MPLv2",
+  "source": "crater",
+  "import_client": [],
+  "import_server": [],
+  "definition_files": []
+}

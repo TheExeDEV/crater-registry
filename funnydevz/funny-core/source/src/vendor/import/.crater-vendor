@@ -1,0 +1,11 @@
+{
+  "realm": "client",
+  "packages": [
+    "daily3014/cryptography@4.1.0",
+    "ifmnb/algo-sat@0.0.1",
+    "ifmnb/buffer-array@0.0.1",
+    "ifmnb/crate@0.0.1",
+    "ifmnb/quat@0.0.1",
+    "rocks/lualinq@1.6.0"
+  ]
+}

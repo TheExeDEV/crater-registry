@@ -1,0 +1,10 @@
+{
+  "name": "ifmnb/buffer-array",
+  "version": "0.0.1",
+  "description": "An array created based on buffer",
+  "license": "MPLv2",
+  "source": "crater",
+  "import_client": [],
+  "import_server": [],
+  "definition_files": []
+}

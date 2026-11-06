@@ -1,0 +1,10 @@
+{
+  "name": "ifmnb/buffer-bitmap",
+  "version": "0.0.1",
+  "description": "A buffer-based bitmap",
+  "license": "MPLv2",
+  "source": "crater",
+  "import_client": [],
+  "import_server": [],
+  "definition_files": []
+}
