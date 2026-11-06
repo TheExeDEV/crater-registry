@@ -1,0 +1,44 @@
+--!strict
+
+const Maybe = require('../../../../common/gc/Maybe')
+const IKR6Arm = require('./IKR6Arm')
+const IKR6Solver = require('./IKR6Solver')
+const types = require('../../../../../static/declare/types')
+const ftype = require('../../../../../static/ftype')
+
+const private = {type = "ikr6arms"}
+const class : ikr6arms = IKR6Solver:new {
+    type = private.type,
+
+    get_left_arm = ftype:write(function (self: ikr6arms) : ikr6arm
+        if not private.maybe_left_arms:exist(self) then
+            const arm = private.maybe_left_arms:enactment(self, IKR6Arm)
+            self:finally(arm)
+            return arm
+        else
+    		return private.maybe_left_arms:enactment(self, IKR6Arm)
+        end
+    end, IKR6Arm.type, private.type),
+
+    get_right_arm = ftype:write(function (self: ikr6arms) : ikr6arm
+        if not private.maybe_right_arms:exist(self) then
+            const arm = private.maybe_right_arms:enactment(self, IKR6Arm)
+            self:finally(arm)
+            return arm
+        else
+            return private.maybe_right_arms:enactment(self, IKR6Arm)
+        end
+    end, IKR6Arm.type, private.type),
+
+    is_initiated = ftype:write(function (self: ikr6arms) : boolean
+        return private.maybe_left_arms:exist(self) and private.maybe_right_arms:exist(self)
+    end, types.boolean, private.type),
+}
+
+do
+    private.maybe_left_arms = Maybe:new() :: maybe<ikr6arm, ikr6arms>
+    private.maybe_right_arms = Maybe:new() :: maybe<ikr6arm, ikr6arms>
+
+end
+
+return class

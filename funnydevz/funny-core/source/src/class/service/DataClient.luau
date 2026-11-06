@@ -1,0 +1,137 @@
+--!strict
+const Event = require('../common/signal/Event')
+const EnumItem = require('../core/EnumItem')
+const EnumObject = require('../core/EnumObject')
+const Scheduler = require('../core/Scheduler')
+const Service = require('../core/Service')
+const SharedNet = require('./SharedNet')
+const NetPack = require('../struct/common/NetPack')
+const mtypes = require('../../static/declare/mtypes')
+const types = require('../../static/declare/types')
+const DataInternalVariant = require('../../enums/descriptor/DataInternalVariant')
+const SharedNetLink = require('../../enums/descriptor/SharedNetLink')
+const DataNotification = require('../../enums/notification/DataNotification')
+const NetNotification = require('../../enums/notification/NetNotification')
+const DataState = require('../../enums/state/DataState')
+const std = require('../../extension/std')
+const ftype = require('../../static/ftype')
+
+type data_event = event<enumitem_data_notification, ...any>
+
+const private = {type = "dataclient", active = false}
+const class: dataclient = Service:new({
+	type = private.type,
+	name = "DataClient",
+
+	start = ftype:write(function(self: dataclient): ()
+		if self.enabled then
+			return
+		end
+
+		if private.active then
+			return
+		end
+
+		self.enabled = true
+		private.active = true
+
+		const scheduler = Scheduler:whose()
+		if scheduler then
+			scheduler:plan(private.connect)
+		else
+			task.spawn(private.connect)
+		end
+	end, mtypes.never, private.type),
+
+	get_state = ftype:write(function(self: dataclient): enumitem_data_state
+		return private.state
+	end, EnumItem.type, private.type),
+
+	get_value = ftype:write(function<T>(self: dataclient, path: data_path): T
+		local node: any = private.data
+
+		for k, v in private.split(path) do
+			if type(node) ~= types.table then
+				return nil :: any
+			end
+
+			node = node[v]
+		end
+
+		return node
+	end, ftype:opt(mtypes.anyt), private.type, ftype:uor(types.string, types.table)),
+
+	wait_loaded = ftype:write(function(self: dataclient): ()
+		if private.state ~= DataState.ProfileLoaded then
+			private.event:wait(DataNotification.DataLoaded)
+		end
+	end, mtypes.never, private.type),
+
+	get_data_event = ftype:write(function(self: dataclient): data_event
+		return private.event
+	end, Event.type, private.type),
+})
+
+do
+	private.state = DataState.ProfileLoading :: enumitem_data_state
+	private.data = {} :: data_snapshot
+	private.event = Event:new() :: data_event
+
+	function private.connect()
+		const net = SharedNet:get_event(SharedNetLink.Data)
+
+		net:connect(NetNotification.Received, function(pack: netpack)
+			const action, a, b = pack:payload()
+
+			if action == DataInternalVariant.DataSnapshot.hashlink then
+				private.apply_snapshot(a)
+			elseif action == DataInternalVariant.DataSet.hashlink then
+				private.apply_set(a, b)
+			else
+				const try_get_enumitem = EnumObject:get_enum_by_hashlink(tostring(action))
+				std:oute(`unexpected action type {action} >> {try_get_enumitem and try_get_enumitem.name or "*unknown-enumitem*"}`)
+			end
+		end)
+
+		SharedNet:emit_event(net, NetPack:pack(nil, DataInternalVariant.DataReady.hashlink))
+	end
+
+	function private.split(path: data_path): { string }
+		if type(path) == types.table then
+			return path :: { string }
+		end
+
+		return string.split(path :: string, "/")
+	end
+
+	function private.apply_snapshot(snapshot: data_snapshot)
+		private.data = snapshot
+
+		for k, v in snapshot do
+			private.event:invoke(DataNotification.DataChanged, k, v)
+		end
+
+		if private.state ~= DataState.ProfileLoaded then
+			private.state = DataState.ProfileLoaded
+			private.event:invoke(DataNotification.DataLoaded)
+		end
+	end
+
+	function private.apply_set(segments: { string }, to: unknown)
+		local node: any = private.data
+
+		for k = 1, #segments - 1 do
+			node = node[segments[k] ]
+
+			if type(node) ~= types.table then
+				std:oute(`bad replicated path {table.concat(segments, "/")}`)
+				return
+			end
+		end
+
+		node[segments[#segments] ] = to
+		private.event:invoke(DataNotification.DataChanged, table.concat(segments, "/"), to)
+	end
+end
+
+return class

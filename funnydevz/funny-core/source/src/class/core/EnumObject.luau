@@ -1,0 +1,121 @@
+--!strict
+
+const EnumItem = require('./EnumItem')
+const LuaObject = require('./LuaObject')
+const types = require('../../static/declare/types')
+const std = require('../../extension/std')
+const ftype = require('../../static/ftype')
+
+type indexed = enumobject & { [unknown]: unknown }
+
+const private = { type = "enumobject" }
+const class: enumobject = LuaObject:new({
+	type = private.type,
+	name = private.type,
+	build_enumitem_mark = newproxy(),
+
+	get_enums_list = ftype:write(function<T>(self: enumobject): { [unknown]: enumitem }
+		const result: { [unknown]: enumitem } = {}
+		for i, v in self :: { [string]: unknown } do
+			if self:that(v, EnumItem.type) then
+				result[i] = v :: enumitem
+			end
+		end
+
+		return result
+	end, types.table, private.type),
+
+	get_enums_count = ftype:write(function(self: enumobject): number
+		local count = 0
+
+		for _, _ in self:get_enums_list() do
+			count += 1
+		end
+
+		return count
+	end, types.number, private.type),
+
+	get_enums_name = ftype:write(function(self: enumobject, ...: enumitem): ...string
+		const result: { string } = {}
+
+		for i, v in { ... } do
+			if self:is_my_enumitem(v) then
+				table.insert(result, v.name)
+			end
+		end
+
+		return unpack(result)
+	end, ftype:var(types.string), private.type, ftype:var(EnumItem.type)),
+
+	get_hashlink_list = ftype:write(function(self: enumobject): { string }
+		const result = {}
+
+		for _, v in self:get_enums_list() do
+			table.insert(result, v.hashlink)
+		end
+
+		return result
+	end, types.table, private.type),
+
+	get_enum_by_name = ftype:write(function(self: enumobject, name: string): enumitem?
+		const var: unknown = (self :: indexed)[name]
+
+		if self:that(var, EnumItem.type) then
+			return var :: enumitem
+		end
+
+		return nil
+	end, ftype:opt(EnumItem.type), private.type, types.string),
+
+	get_enum_by_hashlink = ftype:write(function(self: enumobject, hashlink: string): enumitem?
+		for _, v in self:get_enums_list() do
+			if v.hashlink == hashlink then
+				return v
+			end
+		end
+
+		return nil
+	end, EnumItem.type, private.type, types.string),
+
+	is_my_enumitem = ftype:write(function(self: enumobject, that: enumitem | string): boolean
+		if self:that(that, EnumItem.type) then
+			const var = that :: enumitem
+
+			return (self :: indexed)[var.name] ~= nil and var.enum == self
+		elseif type(that) == types.string then
+			const var = that :: string
+			const item: unknown = (self :: indexed)[var]
+
+			if item == nil then
+				return false
+			end
+			if self:that(item, EnumItem.type) then
+				return true
+			end
+
+		else
+			std:oute("unexpected that for enumitem")
+		end
+
+		return false
+	end, types.boolean, private.type, EnumItem.type),
+})
+
+class:host(function(new)
+	const new = new:as<<enumobject>>(class.type)
+
+	for i, v in new :: { [unknown]: unknown } do
+		if i == "build_enumitem_mark" then
+			continue
+		elseif v == new.build_enumitem_mark then
+			const new_item = EnumItem:new({
+				name = tostring(i),
+				enum = new,
+			})
+
+			new[i] = new_item
+		end
+	end
+end)
+
+return class
