@@ -1,0 +1,56 @@
+{
+  "name": "ifmnb/buffer-array",
+  "versions": [
+    {
+      "version": "0.0.1",
+      "sha256": "c447e0ef127d824c6775a4020736b59a04427a10ae0f172e9ad506d59e864c12",
+      "published_at": "2026-11-06T20:39:47.4808266+00:00",
+      "manifest": {
+        "name": "ifmnb/buffer-array",
+        "authors": [
+          "IFMNB"
+        ],
+        "description": "An array created based on buffer",
+        "license": "MPLv2",
+        "version": "0.0.1",
+        "keywords": [
+          "array",
+          "buffer",
+          "universal"
+        ],
+        "registry": "crater",
+        "repository": "https://github.com/IFMNB/luau-math",
+        "can_publish": true,
+        "registries": {},
+        "import_to": "shared",
+        "path_to_main": "init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "vendor_packages": {
+          "import_client": [
+            "ifmnb/buffer-bitmap@0.0.1"
+          ]
+        },
+        "overrides": [],
+        "workspace": [],
+        "scripts": {},
+        "tools": {},
+        "package_scripts": {
+          "block": false,
+          "allow": []
+        },
+        "package_files": {
+          "exclude": [],
+          "allow": []
+        },
+        "monorepository-elements": {},
+        "interface": false,
+        "realized_interfaces": [],
+        "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
+      },
+      "scripts": []
+    }
+  ]
+}

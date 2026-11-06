@@ -1,0 +1,6 @@
+{
+  "aliases": {
+    "client": "./_vendor/client",
+    "import": "./import"
+  }
+}
