@@ -1,0 +1,10 @@
+{
+  "name": "lm-loleris/profilestore",
+  "version": "1.0.3",
+  "description": "Periodic DataStore saving solution with session locking",
+  "license": "",
+  "source": "external",
+  "import_client": [],
+  "import_server": [],
+  "definition_files": []
+}
