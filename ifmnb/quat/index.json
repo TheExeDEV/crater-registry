@@ -1,0 +1,49 @@
+{
+  "name": "ifmnb/quat",
+  "versions": [
+    {
+      "version": "0.0.1",
+      "sha256": "59ecfef2a86e3136bc2a98c59f517698de73e079536f60ba4a5da6c15faa9de2",
+      "published_at": "2026-11-06T20:43:30.0277045+00:00",
+      "manifest": {
+        "name": "ifmnb/quat",
+        "authors": [
+          "IFMNB"
+        ],
+        "description": "A half-cropped quaternion based on a vector without the w part.",
+        "license": "MPLv2",
+        "version": "0.0.1",
+        "keywords": [
+          ""
+        ],
+        "registry": "crater",
+        "repository": "https://github.com/IFMNB/luau-geometry",
+        "can_publish": true,
+        "registries": {},
+        "import_to": "shared",
+        "path_to_main": "init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "overrides": [],
+        "workspace": [],
+        "scripts": {},
+        "tools": {},
+        "package_scripts": {
+          "block": false,
+          "allow": []
+        },
+        "package_files": {
+          "exclude": [],
+          "allow": []
+        },
+        "monorepository-elements": {},
+        "interface": false,
+        "realized_interfaces": [],
+        "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
+      },
+      "scripts": []
+    }
+  ]
+}
