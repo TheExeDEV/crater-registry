@@ -184,9 +184,6 @@ do
 
         const succ, err = pcall(behavior.invoke, behavior, notification, behavior, payload)
 
-        if not succ then
-            std:outw(`item {item.name} {notification.name} failed: {err}`)
-        end
     end
 
     private.get_maybe = function (self: character)

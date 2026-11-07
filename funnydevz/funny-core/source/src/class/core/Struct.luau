@@ -22,9 +22,6 @@ const class: struct = LuaObject:new({
             end
         end
 
-        if base == nil then
-            std:oute "cannot take base, return self"
-        end
         return base and base:new(reconv) or self
     end, private.type, private.type),
 

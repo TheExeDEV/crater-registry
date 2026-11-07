@@ -235,14 +235,12 @@ do
         private.is_valid = function (ikr6foot: ikr6foot): boolean
             const reference_to_origin = ikr6foot:get_reference()
             if not reference_to_origin:is_instance_exists() then
-                std:outm("cannot process leg fallback, because origin does not exists")
 
                 return false
             end
 
             const reference_to_fake = ikr6foot:get_fake()
             if not reference_to_fake:is_instance_exists() then
-                    std:outm("cannot process leg fallback, because fake does not exists")
 
                 return false
             end
@@ -259,7 +257,6 @@ do
                 const fake_leg = fake:get_instance()
                 foot.fallback_basis = Basis:to_basis(fake_leg.CFrame)
             else
-                    std:outw("fake_leg does not exists, cannot create fallback basis, nothing to do")
             end
 
         end
@@ -483,7 +480,6 @@ do
             const reference_to_fake = foot:get_fake()
 
             if not reference_to_fake:is_instance_exists() then
-                std:outw("RealFK: fake does not exist")
                 return
             end
 
@@ -533,7 +529,6 @@ do
                 const fake = ikr6foot:get_fake()
 
                 if not fake:is_instance_exists() then
-                        std:outw("cannot process null-reference fake-leg")
 
                     continue
                 end
@@ -633,15 +628,11 @@ do
         if not reference_to_humanoid:is_instance_exists() then 
             private.mark_unactive(ik)
 
-                std:outw ('this solver has no humanoid, skip')
-
             return
         end
 
         if not reference_to_torso:is_instance_exists() then
             private.mark_unactive(ik) 
-
-            std:outw('this solver has no torso, skip')
 
             return
         end

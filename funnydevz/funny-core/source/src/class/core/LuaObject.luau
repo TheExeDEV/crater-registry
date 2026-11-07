@@ -187,18 +187,12 @@ const class: luaobject = {
 		const func = meta:read_func(name)
 
 		if func == nil then
-			std:outm(`tcall: function "{name}" not registered on "{self.type}"`)
 			return
 		end
 
 		local ffunc_self: ((...any) -> ...any)? = (self :: any)[name]
 
 		if ffunc_self == nil then
-			std:outm([[
-                    (!*) The difference of meta information at the class level.
-
-                    Apparently, the function is unexpectedly nil, although it is expected to exist.
-                    In this case, there will be an attempt to find her through the base.]])
 
 			local base = self:base() :: luaobject?
 
@@ -211,11 +205,6 @@ const class: luaobject = {
 						break
 					end
 				else
-					std:outm(
-						[[
-                            (!*) tcall couldn't reach the function because it's not in the base or in the object itself.
-                            This probably indicates that there is misinformation in the class metadata.]]
-					)
 					return
 				end
 
@@ -228,7 +217,6 @@ const class: luaobject = {
 		end
 
 		if not ftype:validate(ffunc_self, self, ...) then
-			std:outm(`tcall: arguments dont match signature of "{name}"`)
 			return
 		end
 
@@ -320,9 +308,6 @@ do
 			for i, v in host do
 				const state, err = pcall(v, of)
 
-				if not state then
-					std:oute(of.type, ttable.find(private.host_list, host) or `*missed-{class.type}*`, err)
-				end
 			end
 		end
 	end
@@ -338,17 +323,6 @@ do
 
 	private.generate_identity(class)
 
-	if mtluaobject.luaobject_type ~= type(class) then
-		std:oute(`{class.type} has different type() results ({type(class)} vs {mtluaobject.luaobject_type})`)
-	end
-
-	if mtluaobject.luaobject_can_get_type_by_tostring_func then
-		std:outw(`please check tostring() property of {class.type}`)
-	end
-
-	class:host(function(new: luaobject)
-		std:out(`{class.type} ::new {new.type}`)
-	end)
 end
 
 return class

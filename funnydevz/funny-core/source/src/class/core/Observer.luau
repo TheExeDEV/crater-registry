@@ -212,8 +212,6 @@ do
 				const flat = private.create_flatted_on(v)
 				table.move(flat, 1, #flat, #output_for_cycle + 1, output_for_cycle)
 			end
-		else
-			std:oute("unknown CallType")
         end
 
 		return output_for_cycle
@@ -278,8 +276,6 @@ do
 			const var_observer = v :: observer
 			var_observer:notificate(related.notification_of, ...)
             return true
-        else
-			std:oute("unexpected connection, skip")
 		end
 
 		return false
@@ -344,11 +340,6 @@ do
 		const target_list = work.mode_list[mode] or {}
 
 		if work.work_list ~= target_list then
-			if not pointer:is_pointed_exists() then
-				if global.debug then
-					std:oute("pointer does not exist?")
-				end
-			end
 
 			const pointed = pointer:get_pointed()
 			table.remove(work.work_list, table.find(work.work_list, pointed) or 0)

@@ -25,7 +25,6 @@ const class: obbvolume = CubeVolume:new({
 		local new = private.convert(values[1])
 
 		if not new then
-			std:oute("unsupported geometry in OBB from")
 			return self:clone()
 		end
 
@@ -59,7 +58,6 @@ const class: obbvolume = CubeVolume:new({
 			const volume = private.convert(value)
 
 			if not volume then
-				std:oute("unsupported geometry in OBB middle")
 				return self:clone()
 			end
 
@@ -104,7 +102,6 @@ const class: obbvolume = CubeVolume:new({
 			const volume = private.convert(value :: any)
 
 			if not volume then
-				std:oute("unsupported geometry in OBB is_inside")
 				return false
 			end
 
@@ -131,7 +128,6 @@ const class: obbvolume = CubeVolume:new({
 			const volume = private.convert(value :: any)
 
 			if not volume then
-				std:oute("unsupported geometry in OBB is_intersection")
 				return false
 			end
 
@@ -505,7 +501,6 @@ do
 			const converted = private.convert(value)
 
 			if not converted then
-				std:oute("unsupported geometry in OBB cover")
 				return result
 			end
 
@@ -536,7 +531,6 @@ do
 				end
 			end
 		else
-			std:oute("cannot reach unknown LuaObject, skipped")
 			return nil
 		end
 

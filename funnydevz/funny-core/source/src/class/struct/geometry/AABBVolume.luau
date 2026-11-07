@@ -25,7 +25,6 @@ const class: aabbvolume = CubeVolume:new({
 				const other_min, other_max = private.get_instance_bounds(instance)
 
 				if not other_min or not other_max then
-					std:oute("unsupported Instance in AABB is_inside")
 					return false
 				end
 
@@ -45,7 +44,6 @@ const class: aabbvolume = CubeVolume:new({
 					return false
 				end
 			else
-				std:oute("unsupported geometry in AABB is_inside")
 				return false
 			end
 		end
@@ -71,7 +69,6 @@ const class: aabbvolume = CubeVolume:new({
 				const other_min, other_max = private.get_instance_bounds(instance)
 
 				if not other_min or not other_max then
-					std:oute("unsupported Instance in AABB is_intersection")
 					return false
 				end
 
@@ -91,7 +88,6 @@ const class: aabbvolume = CubeVolume:new({
 					return false
 				end
 			else
-				std:oute("unsupported geometry in AABB is_intersection")
 				return false
 			end
 		end
@@ -119,7 +115,6 @@ const class: aabbvolume = CubeVolume:new({
 			const other_min, other_max = private.get_bounds(self, value)
 
 			if not other_min or not other_max then
-				std:oute("unsupported geometry in AABB from")
 				return self:clone()
 			end
 
@@ -351,7 +346,6 @@ do
 			const other_min, other_max = private.get_bounds(self, value)
 
 			if not other_min or not other_max then
-				std:oute("unsupported geometry in AABB middle")
 				return self:clone()
 			end
 
@@ -373,7 +367,6 @@ do
 			const other_min, other_max = private.get_bounds(self, value)
 
 			if not other_min or not other_max then
-				std:oute("unsupported geometry in AABB cover")
 				return self:clone()
 			end
 
