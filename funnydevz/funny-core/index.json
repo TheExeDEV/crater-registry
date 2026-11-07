@@ -85,6 +85,91 @@
         "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
       },
       "scripts": []
+    },
+    {
+      "version": "0.0.3",
+      "sha256": "145942c05d1b9f95f1d575d390cfb14def1097cfdffd8667cd0a8e178146ceb1",
+      "published_at": "2026-11-07T22:05:55.7688921+00:00",
+      "manifest": {
+        "name": "funnydevz/funny-core",
+        "authors": [
+          "IFMNB",
+          "TheExeDEV"
+        ],
+        "description": "The object foundation for Roblox, which provides tools for creating games without spending time developing tools",
+        "license": "MPLv2",
+        "version": "0.0.3",
+        "keywords": [
+          "roblox",
+          "core",
+          "foundation",
+          "library",
+          "engine",
+          "game-ready"
+        ],
+        "registry": "crater",
+        "repository": "https://github.com/FunnyDevz/funny-core",
+        "can_publish": true,
+        "registries": {},
+        "import_to": "shared",
+        "path_to_main": "",
+        "path_to_definition_files": [
+          "./src/core.d.luau"
+        ],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [
+          "Jest:wally#roblox/jest@=3.20.0",
+          "JestGlobals:wally#roblox/jest-globals@=3.20.0"
+        ],
+        "vendor_packages": {
+          "import_client": [
+            "LINQ:luarocks#rocks/lualinq",
+            "Quat:ifmnb/quat@0.0.1",
+            "SAT:ifmnb/algo-sat@0.0.1",
+            "Cryptography:wally#daily3014/cryptography@4.1.0",
+            "BufferedArrays:ifmnb/buffer-array@0.0.1",
+            "ifmnb/crate@0.0.1"
+          ],
+          "import_server": [
+            "ProfileStore:wally#lm-loleris/profilestore@1.0.3"
+          ]
+        },
+        "package_root": "build/package",
+        "overrides": [],
+        "workspace": [],
+        "scripts": {
+          "prepack": "python3 build/prepack.py"
+        },
+        "tools": {
+          "darklua": "seaofvoices/darklua@0.19.0",
+          "stylua": "JohnnyMorganz/StyLua@2.6.0",
+          "rojo": "rojo-rbx/rojo@7.7.1",
+          "luau-lsp": "JohnnyMorganz/luau-lsp@1.70.1",
+          "jest-roblox-cli": "christopher-buss/jest-roblox-cli@0.4.10"
+        },
+        "package_scripts": {
+          "block": true,
+          "allow": []
+        },
+        "package_files": {
+          "exclude": [
+            "CI/**",
+            ".github/**",
+            "build/**",
+            "src/temp/**",
+            "**/__pycache__/**",
+            "jest.config.json",
+            "test.project.json"
+          ],
+          "allow": []
+        },
+        "monorepository-elements": {},
+        "interface": false,
+        "realized_interfaces": [],
+        "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
+      },
+      "scripts": []
     }
   ]
 }
