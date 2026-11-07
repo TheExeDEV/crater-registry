@@ -245,7 +245,6 @@ const class: scheduler = LuaObject:new {
 					-- Code that controls our coroutine can return control to us
 					-- by scheduler:plan or something
 					
-					table.remove(loc.planned, table.find(loc.planned, tar) or 0)
 				end
 			elseif status == "dead" then
 				table.remove(loc.planned, table.find(loc.planned, tar) or 0)
