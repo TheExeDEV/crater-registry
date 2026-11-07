@@ -36,9 +36,6 @@ const class: reference = (Observer :: observer<enumitem_reference_notification>)
 			return (self:get_instance() :: any)[name]
 		end)
 
-		const instance = self:get_instance() :: any
-		std:outw(`{self.type}:read_field({name}) return {status} with {result} for {instance and typeof(instance) == rbxtypes.Instance and instance.Name or "*unknown*"}`)
-
 		return status == true and result or nil
 	end, ftype:opt(mtypes.anyt), private.type, mtypes.anyt),
 
@@ -48,7 +45,6 @@ const class: reference = (Observer :: observer<enumitem_reference_notification>)
 				(self:get_instance() :: any)[name] = to
 			end)
 
-			std:outw(`{self.type}:write_field({name}, {to}) return {state} with {out}`)
 		end
 	end, mtypes.never, private.type, mtypes.anyt, ftype:opt(mtypes.anyt)),
 

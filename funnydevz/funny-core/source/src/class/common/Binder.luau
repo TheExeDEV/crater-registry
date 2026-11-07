@@ -140,7 +140,6 @@ do
 		const succ, result = pcall(private.make, that, instance)
 
 		if not succ then
-			std:outw(`{class.type} "{that.tag}" cannot bind {instance:GetFullName()}:`, result)
 			return
 		end
 

@@ -238,13 +238,11 @@ const ftype: ftype = table.freeze({
 
 			if argument.var then
 				if has_var then
-					std:oute("ftype args with .var already exists, skip")
 					continue
 				end
 
 				has_var = true
 			elseif has_var then
-				std:oute("ftype args after .var is not allowed, skip")
 				continue
 			end
 
