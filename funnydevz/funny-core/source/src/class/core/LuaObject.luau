@@ -346,9 +346,6 @@ do
 		std:outw(`please check tostring() property of {class.type}`)
 	end
 
-	class:host(function(new: luaobject)
-		std:out(`{class.type} ::new {new.type}`)
-	end)
 end
 
 return class

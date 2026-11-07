@@ -93,8 +93,6 @@ const class: enumobject = LuaObject:new({
 				return true
 			end
 
-		else
-			std:oute("unexpected that for enumitem")
 		end
 
 		return false

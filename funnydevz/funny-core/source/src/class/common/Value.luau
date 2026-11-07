@@ -41,8 +41,6 @@ const class: value = (Observer :: observer<enumitem_operation_variant>):new({
 			self:notificate(OperationVariant.Change)
 		elseif value == nil then
 			self:notificate(OperationVariant.Remove)
-		else
-			std:outw("unexpected value behaviour, skip")
 		end
 
 	end, mtypes.never, private.type, mtypes.anyt, ftype:opt(types.boolean)),
