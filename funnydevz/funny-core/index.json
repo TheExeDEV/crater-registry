@@ -84,7 +84,8 @@
         "realized_interfaces": [],
         "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
       },
-      "scripts": []
+      "scripts": [],
+      "deprecated": "Broken: built with DEBUG enabled, disabled code was not stripped. Use 0.0.6 or newer."
     },
     {
       "version": "0.0.3",
