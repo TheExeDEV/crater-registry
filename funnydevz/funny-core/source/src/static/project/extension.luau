@@ -19,7 +19,6 @@ const extension = table.freeze {
             вывода `oute()` или других выводов, которые кидают ошибки.
         ]==]
         traceback = 
- not 
  true
     }
 }

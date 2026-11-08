@@ -84,8 +84,6 @@ const class: netpack = Struct:new({
 
 			if player then
 				table.insert(result, player)
-			else
-				std:out(`{self.type} target {v} isn't in the game`)
 			end
 		end
 
@@ -124,8 +122,6 @@ class:host(function(new)
 			table.insert(to, (v :: Player).UserId)
 		elseif type(v) == types.number then
 			table.insert(to, v :: number)
-		else
-			std:out("unexpected netpack target", v)
 		end
 	end
 	this.to = to

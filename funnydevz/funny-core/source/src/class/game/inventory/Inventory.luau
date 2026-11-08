@@ -130,7 +130,6 @@ const class: inventory = (Observer :: observer<enumitem_list_notification>):new(
 			const item = v:get_item():get_value()
 
 			if not item then
-				std:outw("cannot insert an item instance without an item description")
 				continue
 			end
 
@@ -524,10 +523,6 @@ do
 	private.make_instance = function(data: entry): iteminstance
 		const instance: iteminstance = if data.kind == ItemStack.type then ItemStack:new() else ItemObject:new()
 		const item = if data.item then Item:get_by_name(data.item) else nil
-
-		if data.item and not item then
-			std:outw(`replicated item {data.item} isn't registered on the client`)
-		end
 
 		if class:that(item, Item.type) then
 			instance:get_item():set_value(item :: item)

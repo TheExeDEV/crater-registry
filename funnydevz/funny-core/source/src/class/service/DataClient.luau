@@ -87,9 +87,6 @@ do
 				private.apply_snapshot(a)
 			elseif action == DataInternalVariant.DataSet.hashlink then
 				private.apply_set(a, b)
-			else
-				const try_get_enumitem = EnumObject:get_enum_by_hashlink(tostring(action))
-				std:oute(`unexpected action type {action} >> {try_get_enumitem and try_get_enumitem.name or "*unknown-enumitem*"}`)
 			end
 		end)
 
@@ -124,7 +121,6 @@ do
 			node = node[segments[k] ]
 
 			if type(node) ~= types.table then
-				std:oute(`bad replicated path {table.concat(segments, "/")}`)
 				return
 			end
 		end

@@ -16,7 +16,6 @@ const class: ability = (Observer :: observer<enumitem_ability_notification>):new
 
     activate = function (self: ability, on: character, ...: any) : ()
         if not self:cooldown():is_finished() then
-            std:out("cannot active current ability, cooldown")
 
             return
         end

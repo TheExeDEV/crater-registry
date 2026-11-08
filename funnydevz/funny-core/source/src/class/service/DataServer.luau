@@ -35,7 +35,6 @@ const class: dataserver = Service:new({
 		end
 
 		if not ProfileStore then
-			std:oute("DataServer cannot be called on the client, womp.")
 			
 			return
 		end
@@ -191,10 +190,6 @@ const class: dataserver = Service:new({
 		const store = private.get_store()
 		const succ, err = pcall(store.MessageAsync, store, private.env.key(user_id), message)
 
-		if not succ then
-			std:outw(`data failed to send a message to {user_id}:`, err)
-		end
-
 		return succ
 	end, types.boolean, private.type, types.number, types.table),
 
@@ -250,10 +245,6 @@ do
 			return nil
 		end
 
-		if engine.is_studio and private.env.studio.mock then
-			return store.Mock
-		end
-
 		return store
 	end
 
@@ -276,7 +267,6 @@ do
 		})
 
 		if not profile then
-			std:outw(`data Failed to load {player.Name}: the session is locked by another server or the store is down`)
 
 			private.set_state(player, DataState.ProfileReleased)
 			players.kick(player, "Your data couldn't be loaded, please rejoin")
@@ -288,7 +278,6 @@ do
 
 		profile.OnSessionEnd:Connect(function()
 			if players.is_in_game(player) then
-				std:outw(`data session of {player.Name} ended by another server`)
 			end
 			private.release(player, profile)
 			players.kick(player, "Your data was opened on another server, please rejoin")
@@ -321,10 +310,6 @@ do
 				private.event:invoke(DataNotification.DataMessage, player, message, processed)
 			end
 		end)
-
-		if engine.is_studio then
-			std:out(`data {player.Name} loaded:`, profile.Data)
-		end
 
 		private.set_state(player, DataState.ProfileLoaded)
 		private.send_snapshot(player)
