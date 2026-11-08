@@ -32,11 +32,6 @@ const class: disposable = LuaObject:new({
 		const point = private.gclink[self]
 		const dest = point and private.gcfinally[point]
 		if not dest then
-			if not self:is(private.type) then
-				std:outw(`you're trying to set finally function to {self.type} object that isn't a disposable or his child.`)
-			else
-				std:outw(`object {self.type} with {self:iden()} isn't exist in our gc-lists`)
-			end
 
 			return
 		end
@@ -58,8 +53,6 @@ const class: disposable = LuaObject:new({
 				end
 			elseif type(val) == types["function"] then
 				dest[len + i] = val
-			else
-				std:outw("received unknown type")
 			end
 		end
 	end, mtypes.never, private.type, types["function"]),
@@ -113,9 +106,6 @@ do
 			for j = #finally, 1, -1 do
 				const state, out = pcall(finally[j], private.gcidentity[pointer])
 
-				if not state then
-					std:outw(`finally part of {private.gcidentity[pointer]} return error, nothing happened but something can be broken. Error is {out}`)
-				end
 			end
 		end
 

@@ -46,7 +46,6 @@ const class: sharednet = Service:new({
 
 			if not self:has_link(link) or not SharedNetVariant:is_my_enumitem(kind) then
 				self.errors += 1
-				std:oute(`unexpected link or {SharedNetVariant.name}, register the link enum with {self.type}:register_links()`)
 				return Event:new() :: any
 			end
 
@@ -129,7 +128,6 @@ const class: sharednet = Service:new({
 
 		if not metadata then
 			self.errors += 1
-			std:oute(`unknown event, take it from {self.type}:get_event(link, variant)`)
 			return
 		end
 
@@ -215,7 +213,6 @@ do
 		end
 
 		that.errors += 1
-		std:oute(`{name} wasn't created by the server, replaced with a local event`)
 		return network.create_remote(nil, name, "BindableEvent")
 	end
 

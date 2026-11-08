@@ -15,9 +15,6 @@ const class : template = (Observer :: observer<enumitem_operation_variant>):new 
     end, types.table, private.type),
 
     set_template = ftype:write(function (self: template, to: {[any]: any}) : ()
-        if not std:check(type(to) == types.table, "received non-table type") then
-            return
-        end
 
         self:set(private.template_key, to)
         self:notificate(OperationVariant.Change, to)
@@ -51,7 +48,6 @@ const class : template = (Observer :: observer<enumitem_operation_variant>):new 
                 setmetatable(to_store, metatable)
             end
         else
-            std:outw(`{self.type} received non-table {type(value_to_clone)}, return empty table`)
 
             to_store = {}
         end

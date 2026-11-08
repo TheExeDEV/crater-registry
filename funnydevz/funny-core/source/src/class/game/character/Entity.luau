@@ -277,7 +277,6 @@ do
 
 			if not succ then
 				k.enabled = false
-				std:outw(`{k.type} step failed, disabled with {err}`)
 			end
 		end
 	end)

@@ -80,8 +80,6 @@ const class: scheduler = LuaObject:new {
 					end
 				end
 			end
-		else
-			std:outw("you're trying to cancel unknown thread")
 		end
 	end, mtypes.never, private.type, ftype:opt(types.thread)),
 
@@ -119,7 +117,6 @@ const class: scheduler = LuaObject:new {
 		time = time or 0
 
 		if run ~= loc.current then
-			std:oute "cannot hold"
 			return
 		end
 
@@ -141,7 +138,6 @@ const class: scheduler = LuaObject:new {
 			return
 		end
 
-		std:oute(`something going wrong with {self.type}, current_tar does not exists`)
 	end, mtypes.never, private.type, ftype:opt(types.number)),
 
 	wait = ftype:write(function(self: scheduler, time: number?): ()
@@ -150,7 +146,6 @@ const class: scheduler = LuaObject:new {
 		const current_tar = loc.current_tar
 
 		if not current_tar then
-			std:oute "tar is nil"
 			return
 		end
 
@@ -171,7 +166,6 @@ const class: scheduler = LuaObject:new {
 	end, mtypes.never, private.type, ftype:var_or(types.thread, types["function"], ftype:var(mtypes.anyt))),
 
 	next = ftype:write(function(self: scheduler, t: any, ...: any): ()
-		std:assert(private.valid(self), "cannot plan next schedule, because this thread actually isn't planned thread")
 
 		const loc = private.get_local(self)
 		const tar = std:assert(loc.current_tar, "current planned coroutine has a troubles")
@@ -190,7 +184,6 @@ const class: scheduler = LuaObject:new {
 	process = ftype:write(function(self: scheduler): ()
 		const loc = private.get_local(self)
 		if coroutine.running() == loc.current then
-			std:oute "you're trying to call scheduler:process() inside a planned coroutine"
 			return
 		end
 		
@@ -245,7 +238,6 @@ const class: scheduler = LuaObject:new {
 					-- Code that controls our coroutine can return control to us
 					-- by scheduler:plan or something
 					
-					table.remove(loc.planned, table.find(loc.planned, tar) or 0)
 				end
 			elseif status == "dead" then
 				table.remove(loc.planned, table.find(loc.planned, tar) or 0)

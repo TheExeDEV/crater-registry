@@ -56,7 +56,6 @@ const class: cubevolume = (GeoVolume :: geovolume<cubevolume>):new({
 		end
 
 		return 
- std:oute("unsupported DirectionVariant item") or 
  vector.zero
 	end, types.vector, tname, EnumItem.type),
 
@@ -162,7 +161,6 @@ const class: cubevolume = (GeoVolume :: geovolume<cubevolume>):new({
 		end
 
 		return 
- std:oute "unsupported DirectionVariant item" or 
  Quad
 	end, Quad.type, tname, EnumItem.type),
 

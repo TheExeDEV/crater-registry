@@ -69,12 +69,6 @@ class:host(function(new)
 	local pointer: pointer
 	
 	pointer = new:subscribe(SetupNotification.Install, ConnectionVariant.Ever, function(mode: enumitem, func: any)
-		if not std:assert(class.is(mode, EnumItem.type), "unexpected LuaObject") then
-			return
-		end
-		if not std:assert(ConnectionVariant:is_my_enumitem(mode), "unexpected move variant") then
-			return
-		end
 
 		new:set(private.key, new:subscribe(private.special, mode :: enumitem_connection_variant, func)
 )

@@ -359,7 +359,6 @@ const ctype: ctype = table.freeze({
 
 		for i, v in of do
 			if typeof(i) ~= types.string then
-				std:oute(`index {i} unsupported, skip`)
 				continue
 			end
 

@@ -468,7 +468,6 @@ do
 			function()
 				if reference:get_instance() ~= new then
 					reference:set_instance(new)
-					std:outw("changing Part instance of R6Foot fake_leg isn't allowed, change aborted")
 				end
 			end
 		)
@@ -486,7 +485,6 @@ do
 			new.CFrame = origin_instance.CFrame
 			new.Parent = origin_instance
 		else
-			std:outw("origin does not exists, fallback to workspace")
 
 			new.Parent = workspace
 		end
