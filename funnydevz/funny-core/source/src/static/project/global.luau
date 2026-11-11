@@ -52,7 +52,7 @@ const global: core_global_info = table.freeze {
     version = "unreleased",
 
     platform = "Roblox" or "UNKNOWN_PLATFORM" :: "UNKNOWN_PLATFORM";
-    unique = "5506cea9c21ef1f47df1d01ba7d774847699afbb" or "UNKNOWN_BUILD";
+    unique = "3802c213a299ca37958bd320127059ab22538396" or "UNKNOWN_BUILD";
 
     nullable = 
  not 
