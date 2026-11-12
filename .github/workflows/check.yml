@@ -13,6 +13,9 @@ jobs:
     name: Check packages
     runs-on: ubuntu-latest
 
+    outputs:
+      auto_merge: ${{ steps.verdict.outputs.auto_merge }}
+
     steps:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -38,4 +41,42 @@ jobs:
           AUTHOR: ${{ github.event.pull_request.user.login }}
           GITHUB_TOKEN: ${{ github.token }}
           BASE: origin/${{ github.base_ref }}
-        run: dotnet "$RUNNER_TEMP/crater-bin/crater.dll" registry check . --base "$BASE" --author "$AUTHOR"
+        run: dotnet "$RUNNER_TEMP/crater-bin/crater.dll" registry check . --base "$BASE" --author "$AUTHOR" --verdict "$RUNNER_TEMP/verdict.json"
+
+      - name: Read the verdict
+        id: verdict
+        run: echo "auto_merge=$(jq -r '.auto_merge' "$RUNNER_TEMP/verdict.json")" >> "$GITHUB_OUTPUT"
+
+  merge:
+    name: Merge
+    needs: check
+    if: needs.check.outputs.auto_merge == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Merge the checked commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: gh pr merge "$NUMBER" --repo "$REPOSITORY" --squash --match-head-commit "$HEAD"
+
+      - name: Ask the website to rebuild
+        env:
+          TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "SITE_DISPATCH_TOKEN is not set, the website rebuilds once a day."
+            exit 0
+          fi
+
+          curl --fail --silent --show-error -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/TheExeDEV/crater-stats/dispatches \
+            -d '{"event_type":"registry-updated"}'
