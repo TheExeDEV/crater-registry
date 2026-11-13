@@ -89,18 +89,6 @@ export type crate = {
 	read _writeable: { string },
 
 	--[==[
-        Publicly reflected type: the string returned by
-        `tostring(instance)` and consumed by external reflection
-        (`ftype`, `mtypes`). If `type` is not passed to `new`, the
-        default is `"userdata"`.
-
-        This is *display only*: for identity checks use
-        `crates:get(instance) ~= nil`, not `tostring`. `__tostring` is
-        trivially spoofable — it is not an identity.
-    ]==]
-	_type: string,
-
-	--[==[
         VM metamethod invoked on a proxy field read: `instance.foo`.
         Walks the `_parent` chain and returns the first `_fields.foo`
         whose `_readable` contains `foo`. If nobody permits it — `error`.
@@ -125,13 +113,6 @@ export type crate = {
         (not `crate._fields`).
     ]==]
 	read __newindex: <T, U, E>(instance: T, index: U, value: E) -> (),
-
-	--[==[
-        VM metamethod for `tostring(instance)`. Returns `_type` (the
-        `"userdata"` fallback is dead code, because `fill` always sets
-        `_type`). Display only — never use for identity checks.
-    ]==]
-	read __tostring: <T>(instance: T) -> string,
 
 	--[==[
         The `__metatable` value: what `getmetatable(instance)` returns
@@ -176,7 +157,7 @@ export type library = {
         and defaults to `"userdata"`. Returns the crate (the trusted
         handle), not the instance.
     ]==]
-	read new: (type: string?) -> crate,
+	read new: () -> crate,
 
     --[==[
         Checks is it a crate instance or not?
@@ -186,9 +167,9 @@ export type library = {
 
 const private = {}
 const library: library = table.freeze {
-    new = function (type: string?) : crate
+    new = function () : crate
         const crate = private.create()
-        private.fill(crate, nil, type)
+        private.fill(crate, nil)
         private.setup(crate)
 
         return crate
@@ -201,9 +182,6 @@ const library: library = table.freeze {
 
 do
     type instance = unknown
-
-
-    private.fallback = "userdata"
 
     do
 		type crates = {
@@ -244,9 +222,8 @@ do
         return crate
     end
 
-    private.fill = function (crate: any, parent, type) : crate
+    private.fill = function (crate: any, parent) : crate
         crate._parent = parent
-        crate._type = type or private.fallback
         crate._extend = private.extend
 
         return crate
@@ -259,15 +236,14 @@ do
         crate_.__index = private.__index
         crate_.__newindex = private.__newindex
         crate_.__iter = private.__iter
-        crate_.__tostring = private.__tostring
         crate_.__metatable = parent and parent._instance or crate._instance
 
         return crate
     end
 
-    private.extend = function (parent: crate, type: string?) : crate
+    private.extend = function (parent: crate) : crate
         const new  = private.create()
-        private.fill(new, parent._instance, type)
+        private.fill(new, parent._instance)
         private.setup(new)
         return new
     end
@@ -289,12 +265,6 @@ do
         end
 
         return error(`Reading of index {tostring(index)} is not allowed`)
-    end
-
-    private.__tostring = function <T> (instance: T) : string
-        const crate = assert(private.crates:get(instance), "crate does not exist")
-
-        return crate._type or private.fallback
     end
 
 	private.__iter = function<T>(instance: T): (any, any, any?)
