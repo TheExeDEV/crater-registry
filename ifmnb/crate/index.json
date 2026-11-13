@@ -94,6 +94,53 @@
         "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
       },
       "scripts": []
+    },
+    {
+      "version": "0.1.0",
+      "sha256": "45c9e2121514d9779f8272999ed52c9a907bb2c8037a75691f00b835d588c209",
+      "published_at": "2026-11-13T11:15:37.2302519+00:00",
+      "manifest": {
+        "name": "ifmnb/crate",
+        "authors": [
+          "IFMNB"
+        ],
+        "description": "Runtime for emulating objects based on userdata",
+        "license": "MPLv2",
+        "version": "0.1.0",
+        "keywords": [
+          "runtime",
+          "OOP",
+          "userdata",
+          "objects"
+        ],
+        "registry": "crater",
+        "repository": "https://github.com/IFMNB/luau-algorithm",
+        "can_publish": true,
+        "registries": {},
+        "import_to": "shared",
+        "path_to_main": "init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "overrides": [],
+        "workspace": [],
+        "scripts": {},
+        "tools": {},
+        "package_scripts": {
+          "block": false,
+          "allow": []
+        },
+        "package_files": {
+          "exclude": [],
+          "allow": []
+        },
+        "monorepository-elements": {},
+        "interface": false,
+        "realized_interfaces": [],
+        "$schema": "https://raw.githubusercontent.com/TheExeDEV/crater/main/schemas/crater.schema.json"
+      },
+      "scripts": []
     }
   ]
 }
