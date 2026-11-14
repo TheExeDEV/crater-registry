@@ -14,39 +14,54 @@
 --!strict
 
 local Types = require("./types")
+local clip = require("./clip")
+local damage = require("./damage")
 local texture_module = require("./texture")
 
-type Context = Types.self
+type Context = Types.Context
 type Glyph = Types.Glyph
 type GlyphMap = Types.GlyphMap
-type Texture = texture_module.Texture
+type Texture = Types.Texture
+type Font = Types.Font
 export type Options = Types.FontOptions
 
-export type Font = {
-	texture: Texture,
-	glyphs: GlyphMap,
-	line_height: number,
-	spacing: number,
-	fallback: number,
-	destroyed: boolean,
-	Destroy: (self: Font) -> (),
+type Point = {
+	x: number,
+	y: number,
+	on: boolean,
 }
 
-type Point = { x: number, y: number, on: boolean }
 type Contour = { Point }
-type TableEntry = { offset: number, length: number }
-type CmapInfo = { offset: number, format: number, length: number }
+
+type TableEntry = {
+	offset: number,
+	length: number,
+}
+
+type CmapInfo = {
+	offset: number,
+	format: number,
+	length: number,
+}
 
 type FontFile = {
 	data: buffer,
 	tables: { [string]: TableEntry },
 	units_per_em: number,
-	glyph_count: number,
-	horizontal_metric_count: number,
 	long_loca: boolean,
+	glyph_count: number,
 	ascender: number,
 	descender: number,
+	horizontal_metric_count: number,
 	cmap: CmapInfo,
+}
+
+type EdgeBuffer = {
+	count: number,
+	from_x: { number },
+	from_y: { number },
+	to_x: { number },
+	to_y: { number },
 }
 
 local DEFAULT_CHARSET =
@@ -64,14 +79,18 @@ local GLYPH_PADDING = 1
 local CURVE_SEGMENTS = 6
 local MAX_COMPOSITE_DEPTH = 8
 local WHITE_RGB = 0x00FFFFFF
+local OPAQUE_WHITE = 0xFFFFFFFF
+local BYTES_PER_PIXEL = 4
+local SUB_SCANLINES = 4
+local ALPHA_PER_SAMPLE = 255 / SUB_SCANLINES
 
 local SFNT_VERSION_TRUETYPE = 0x00010000
 local SFNT_VERSION_APPLE = 0x74727565
 
 local FLAG_ON_CURVE = 0x01
+local FLAG_REPEAT = 0x08
 local FLAG_X_SHORT = 0x02
 local FLAG_Y_SHORT = 0x04
-local FLAG_REPEAT = 0x08
 local FLAG_X_SAME_OR_POSITIVE = 0x10
 local FLAG_Y_SAME_OR_POSITIVE = 0x20
 
@@ -82,43 +101,34 @@ local COMPOSITE_MORE_COMPONENTS = 0x0020
 local COMPOSITE_HAS_XY_SCALE = 0x0040
 local COMPOSITE_HAS_2X2 = 0x0080
 
---[=[
-	@class Font
-
-	Bitmap font backed by a `Texture` atlas.
-
-	Binary loading supports static TrueType-outline `.ttf` files with a Unicode `cmap`
-	(format 4 or 12). CFF OpenType, WOFF/WOFF2, variable-font axes and point-attached
-	composite components are not supported.
-]=]
 local font = {}
-font.__index = font
 
-local function read_u16(data: buffer, offset: number): number
-	return bit32.bor(bit32.lshift(buffer.readu8(data, offset), 8), buffer.readu8(data, offset + 1))
+local read_u32 = function(data: buffer, offset: number): number
+	return bit32.byteswap(buffer.readu32(data, offset))
 end
 
-local function read_i16(data: buffer, offset: number): number
+local read_u16 = function(data: buffer, offset: number): number
+	return bit32.rshift(bit32.byteswap(buffer.readu16(data, offset)), 16)
+end
+
+local read_i16 = function(data: buffer, offset: number): number
 	local value = read_u16(data, offset)
-	return if value >= 0x8000 then value - 0x10000 else value
+
+	return if value >= 32768 then value - 65536 else value
 end
 
-local function read_u32(data: buffer, offset: number): number
-	return bit32.bor(bit32.lshift(read_u16(data, offset), 16), read_u16(data, offset + 2))
-end
-
-local function read_f2dot14(data: buffer, offset: number): number
+local read_f2dot14 = function(data: buffer, offset: number): number
 	return read_i16(data, offset) / 16384
 end
 
-local function require_range(data: buffer, offset: number, length: number, label: string): ()
+local require_range = function(data: buffer, offset: number, length: number, label: string): ()
 	assert(
 		offset >= 0 and length >= 0 and offset + length <= buffer.len(data),
 		"Invalid or truncated TrueType font: " .. label
 	)
 end
 
-local function read_table_directory(data: buffer): { [string]: TableEntry }
+local read_table_directory = function(data: buffer): { [string]: TableEntry }
 	require_range(data, 0, 12, "sfnt header")
 
 	local version = read_u32(data, 0)
@@ -146,7 +156,7 @@ local function read_table_directory(data: buffer): { [string]: TableEntry }
 	return tables
 end
 
-local function find_unicode_cmap(data: buffer, cmap: TableEntry): CmapInfo
+local find_unicode_cmap = function(data: buffer, cmap: TableEntry): CmapInfo
 	local record_count = read_u16(data, cmap.offset + 2)
 	local best_offset: number? = nil
 	local best_format = 0
@@ -158,25 +168,26 @@ local function find_unicode_cmap(data: buffer, cmap: TableEntry): CmapInfo
 		require_range(data, subtable, 4, "cmap subtable")
 
 		local format = read_u16(data, subtable)
-		local is_unicode_platform = platform == 0 or platform == 3
+		local unicode_platform = platform == 0 or platform == 3
 
-		if is_unicode_platform and format == 12 then
+		if unicode_platform and format == 12 then
 			best_offset, best_format = subtable, 12
 			break
-		elseif is_unicode_platform and format == 4 then
+		elseif unicode_platform and format == 4 then
 			best_offset, best_format = subtable, 4
 		end
 	end
 
 	assert(best_offset ~= nil, "TTF has no supported Unicode cmap (format 4 or 12)")
 
-	local length = if best_format == 12 then read_u32(data, best_offset + 4) else read_u16(data, best_offset + 2)
-	require_range(data, best_offset, length, "Unicode cmap")
+	local offset = best_offset :: number
+	local length = if best_format == 12 then read_u32(data, offset + 4) else read_u16(data, offset + 2)
+	require_range(data, offset, length, "Unicode cmap")
 
-	return { offset = best_offset, format = best_format, length = length }
+	return { offset = offset, format = best_format, length = length }
 end
 
-local function parse_font(data: buffer): FontFile
+local parse_font = function(data: buffer): FontFile
 	local tables = read_table_directory(data)
 	local head, maxp, hhea = tables.head, tables.maxp, tables.hhea
 
@@ -205,7 +216,7 @@ local function parse_font(data: buffer): FontFile
 	return file
 end
 
-local function lookup_format12(data: buffer, cmap: CmapInfo, codepoint: number): number
+local lookup_format12 = function(data: buffer, cmap: CmapInfo, codepoint: number): number
 	local low, high = 0, read_u32(data, cmap.offset + 12) - 1
 
 	while low <= high do
@@ -225,7 +236,7 @@ local function lookup_format12(data: buffer, cmap: CmapInfo, codepoint: number):
 	return 0
 end
 
-local function lookup_format4(data: buffer, cmap: CmapInfo, codepoint: number): number
+local lookup_format4 = function(data: buffer, cmap: CmapInfo, codepoint: number): number
 	if codepoint > 0xFFFF then
 		return 0
 	end
@@ -266,7 +277,7 @@ local function lookup_format4(data: buffer, cmap: CmapInfo, codepoint: number): 
 	return 0
 end
 
-local function glyph_index_for(file: FontFile, codepoint: number): number
+local glyph_index_for = function(file: FontFile, codepoint: number): number
 	if file.cmap.format == 12 then
 		return lookup_format12(file.data, file.cmap, codepoint)
 	end
@@ -274,7 +285,7 @@ local function glyph_index_for(file: FontFile, codepoint: number): number
 	return lookup_format4(file.data, file.cmap, codepoint)
 end
 
-local function glyph_offset(file: FontFile, glyph_index: number): number?
+local glyph_offset = function(file: FontFile, glyph_index: number): number?
 	if glyph_index < 0 or glyph_index >= file.glyph_count then
 		return nil
 	end
@@ -297,7 +308,7 @@ local function glyph_offset(file: FontFile, glyph_index: number): number?
 	return file.tables.glyf.offset + start
 end
 
-local function horizontal_metrics(file: FontFile, glyph_index: number): (number, number)
+local horizontal_metrics = function(file: FontFile, glyph_index: number): (number, number)
 	local data, hmtx = file.data, file.tables.hmtx
 	local metric_count = file.horizontal_metric_count
 
@@ -312,7 +323,7 @@ local function horizontal_metrics(file: FontFile, glyph_index: number): (number,
 	return advance, bearing
 end
 
-local function glyph_bounds(file: FontFile, glyph_index: number): (number, number, number, number)
+local glyph_bounds = function(file: FontFile, glyph_index: number): (number, number, number, number)
 	local base = glyph_offset(file, glyph_index)
 
 	if base == nil then
@@ -321,10 +332,13 @@ local function glyph_bounds(file: FontFile, glyph_index: number): (number, numbe
 
 	local data = file.data
 
-	return read_i16(data, base + 2), read_i16(data, base + 4), read_i16(data, base + 6), read_i16(data, base + 8)
+	return read_i16(data, base + 2),
+		read_i16(data, base + 4),
+		read_i16(data, base + 6),
+		read_i16(data, base + 8)
 end
 
-local function read_flags(data: buffer, cursor: number, point_count: number): ({ number }, number)
+local read_flags = function(data: buffer, cursor: number, point_count: number): ({ number }, number)
 	require_range(data, cursor, point_count, "glyph flags")
 	local flags: { number } = table.create(point_count)
 
@@ -336,6 +350,7 @@ local function read_flags(data: buffer, cursor: number, point_count: number): ({
 		if bit32.btest(flag, FLAG_REPEAT) then
 			local repeat_count = buffer.readu8(data, cursor)
 			cursor += 1
+
 			for _ = 1, repeat_count do
 				table.insert(flags, flag)
 			end
@@ -345,7 +360,7 @@ local function read_flags(data: buffer, cursor: number, point_count: number): ({
 	return flags, cursor
 end
 
-local function read_coordinates(
+local read_coordinates = function(
 	data: buffer,
 	cursor: number,
 	flags: { number },
@@ -374,7 +389,7 @@ local function read_coordinates(
 	return values, cursor
 end
 
-local function read_simple_glyph(data: buffer, base: number, contour_count: number): { Contour }
+local read_simple_glyph = function(data: buffer, base: number, contour_count: number): { Contour }
 	local end_points: { number } = table.create(contour_count)
 
 	for index = 0, contour_count - 1 do
@@ -398,7 +413,11 @@ local function read_simple_glyph(data: buffer, base: number, contour_count: numb
 		local contour: Contour = table.create(last_point - first_point + 1)
 
 		for point = first_point, last_point do
-			table.insert(contour, { x = xs[point], y = ys[point], on = bit32.btest(flags[point], FLAG_ON_CURVE) })
+			table.insert(contour, {
+				x = xs[point],
+				y = ys[point],
+				on = bit32.btest(flags[point], FLAG_ON_CURVE),
+			})
 		end
 
 		table.insert(contours, contour)
@@ -410,7 +429,7 @@ end
 
 local read_outline: (file: FontFile, glyph_index: number, depth: number) -> { Contour }
 
-local function read_composite_glyph(file: FontFile, base: number, depth: number): { Contour }
+local read_composite_glyph = function(file: FontFile, base: number, depth: number): { Contour }
 	local data = file.data
 	local contours: { Contour } = {}
 	local cursor = base + 10
@@ -448,12 +467,10 @@ local function read_composite_glyph(file: FontFile, base: number, depth: number)
 			cursor += 2
 		elseif bit32.btest(flags, COMPOSITE_HAS_XY_SCALE) then
 			a, d = read_f2dot14(data, cursor), read_f2dot14(data, cursor + 2)
-
 			cursor += 4
 		elseif bit32.btest(flags, COMPOSITE_HAS_2X2) then
 			a, b = read_f2dot14(data, cursor), read_f2dot14(data, cursor + 2)
 			c, d = read_f2dot14(data, cursor + 4), read_f2dot14(data, cursor + 6)
-
 			cursor += 8
 		end
 
@@ -477,7 +494,7 @@ local function read_composite_glyph(file: FontFile, base: number, depth: number)
 	return contours
 end
 
-function read_outline(file: FontFile, glyph_index: number, depth: number): { Contour }
+read_outline = function(file: FontFile, glyph_index: number, depth: number): { Contour }
 	local base = glyph_offset(file, glyph_index)
 
 	if base == nil or depth > MAX_COMPOSITE_DEPTH then
@@ -495,24 +512,11 @@ function read_outline(file: FontFile, glyph_index: number, depth: number): { Con
 	return {}
 end
 
-local function append_quadratic(from: Point, control: Point, to: Point, output: { Point }): ()
-	for step = 1, CURVE_SEGMENTS do
-		local t = step / CURVE_SEGMENTS
-		local inverse = 1 - t
-
-		table.insert(output, {
-			x = inverse * inverse * from.x + 2 * inverse * t * control.x + t * t * to.x,
-			y = inverse * inverse * from.y + 2 * inverse * t * control.y + t * t * to.y,
-			on = true,
-		})
-	end
-end
-
-local function midpoint(a: Point, b: Point): Point
+local midpoint = function(a: Point, b: Point): Point
 	return { x = (a.x + b.x) * 0.5, y = (a.y + b.y) * 0.5, on = true }
 end
 
-local function contour_to_polygon(contour: Contour): { Point }
+local contour_to_polygon = function(contour: Contour): { Point }
 	local count = #contour
 	local polygon: { Point } = {}
 
@@ -551,7 +555,16 @@ local function contour_to_polygon(contour: Contour): { Point }
 			local endpoint = if following.on then following else midpoint(point, following)
 			local advance = if following.on then 2 else 1
 
-			append_quadratic(current, point, endpoint, polygon)
+			for step = 1, CURVE_SEGMENTS do
+				local t = step / CURVE_SEGMENTS
+				local inverse = 1 - t
+
+				table.insert(polygon, {
+					x = inverse * inverse * current.x + 2 * inverse * t * point.x + t * t * endpoint.x,
+					y = inverse * inverse * current.y + 2 * inverse * t * point.y + t * t * endpoint.y,
+					on = true,
+				})
+			end
 
 			current = endpoint
 			index += advance
@@ -562,82 +575,231 @@ local function contour_to_polygon(contour: Contour): { Point }
 	return polygon
 end
 
-local function winding_number(x: number, y: number, polygon: { Point }): number
-	local winding = 0
-	local previous = polygon[#polygon]
-
-	for _, current in polygon do
-		local side = (current.x - previous.x) * (y - previous.y) - (x - previous.x) * (current.y - previous.y)
-
-		if previous.y <= y then
-			if current.y > y and side > 0 then
-				winding += 1
-			end
-		elseif current.y <= y and side < 0 then
-			winding -= 1
-		end
-
-		previous = current
-	end
-
-	return winding
-end
-
-local function is_inside(x: number, y: number, polygons: { { Point } }): boolean
-	local winding = 0
+local build_edges = function(
+	edges: EdgeBuffer,
+	polygons: { { Point } },
+	x_min: number,
+	y_max: number,
+	scale: number
+): ()
+	local count = 0
+	local from_x, from_y, to_x, to_y = edges.from_x, edges.from_y, edges.to_x, edges.to_y
 
 	for _, polygon in polygons do
-		winding += winding_number(x, y, polygon)
+		local point_count = #polygon
+
+		if point_count >= 2 then
+			local last = polygon[point_count]
+			local previous_x = (last.x - x_min) * scale
+			local previous_y = (y_max - last.y) * scale
+
+			for index = 1, point_count do
+				local point = polygon[index]
+				local current_x = (point.x - x_min) * scale
+				local current_y = (y_max - point.y) * scale
+
+				if current_y ~= previous_y then
+					count += 1
+					from_x[count] = previous_x
+					from_y[count] = previous_y
+					to_x[count] = current_x
+					to_y[count] = current_y
+				end
+
+				previous_x, previous_y = current_x, current_y
+			end
+		end
 	end
 
-	return winding ~= 0
+	edges.count = count
 end
 
-local function rasterize_glyph(
+local add_span = function(coverage: { number }, width: number, start_x: number, end_x: number): ()
+	if start_x > end_x then
+		start_x, end_x = end_x, start_x
+	end
+	if start_x < 0 then
+		start_x = 0
+	end
+	if end_x > width then
+		end_x = width
+	end
+	if end_x <= start_x then
+		return
+	end
+
+	local first = math.floor(start_x)
+	local last = math.ceil(end_x) - 1
+
+	if first < 0 then
+		first = 0
+	end
+	if last > width - 1 then
+		last = width - 1
+	end
+
+	for px = first, last do
+		local left = if px > start_x then px else start_x
+		local right = if px + 1 < end_x then px + 1 else end_x
+		local amount = right - left
+
+		if amount > 0 then
+			coverage[px + 1] += amount
+		end
+	end
+end
+
+local rasterize_glyph = function(
 	atlas: buffer,
 	atlas_width: number,
 	cell_x: number,
 	cell_y: number,
 	width: number,
 	height: number,
-	polygons: { { Point } },
-	x_min: number,
-	y_max: number,
-	scale: number
+	edges: EdgeBuffer
 ): ()
+	local edge_count = edges.count
+
+	if edge_count == 0 or width <= 0 or height <= 0 then
+		return
+	end
+
+	local from_x, from_y, to_x, to_y = edges.from_x, edges.from_y, edges.to_x, edges.to_y
+	local coverage = table.create(width, 0)
+	local hit_x: { number } = table.create(edge_count, 0)
+	local hit_dir: { number } = table.create(edge_count, 0)
+
 	for py = 0, height - 1 do
-		for px = 0, width - 1 do
-			local covered = 0
+		for index = 1, width do
+			coverage[index] = 0
+		end
 
-			for sample_y = 0, 1 do
-				for sample_x = 0, 1 do
-					local font_x = x_min + (px + (sample_x + 0.5) * 0.5) / scale
-					local font_y = y_max - (py + (sample_y + 0.5) * 0.5) / scale
+		for sub = 0, SUB_SCANLINES - 1 do
+			local sample_y = py + (sub + 0.5) / SUB_SCANLINES
+			local hit_count = 0
 
-					if is_inside(font_x, font_y, polygons) then
-						covered += 1
+			for edge = 1, edge_count do
+				local y0, y1 = from_y[edge], to_y[edge]
+				local direction = 0
+
+				if y0 <= sample_y then
+					if y1 > sample_y then
+						direction = 1
 					end
+				elseif y1 <= sample_y then
+					direction = -1
+				end
+
+				if direction ~= 0 then
+					hit_count += 1
+					hit_x[hit_count] = from_x[edge] + (sample_y - y0) * (to_x[edge] - from_x[edge]) / (y1 - y0)
+					hit_dir[hit_count] = direction
 				end
 			end
 
-			if covered > 0 then
-				local alpha = math.floor(covered * 255 / 4 + 0.5)
-				local offset = ((cell_y + py) * atlas_width + cell_x + px) * 4
+			for index = 2, hit_count do
+				local x = hit_x[index]
+				local direction = hit_dir[index]
+				local position = index - 1
 
-				buffer.writeu32(atlas, offset, bit32.bor(WHITE_RGB, bit32.lshift(alpha, 24)))
+				while position >= 1 and hit_x[position] > x do
+					hit_x[position + 1] = hit_x[position]
+					hit_dir[position + 1] = hit_dir[position]
+					position -= 1
+				end
+
+				hit_x[position + 1] = x
+				hit_dir[position + 1] = direction
+			end
+
+			local winding = 0
+			local span_start = 0
+
+			for index = 1, hit_count do
+				local previous = winding
+				winding += hit_dir[index]
+
+				if previous == 0 and winding ~= 0 then
+					span_start = hit_x[index]
+				elseif previous ~= 0 and winding == 0 then
+					add_span(coverage, width, span_start, hit_x[index])
+				end
+			end
+		end
+
+		local row_offset = (cell_y + py) * atlas_width + cell_x
+
+		for px = 0, width - 1 do
+			local amount = coverage[px + 1]
+
+			if amount > 0 then
+				local alpha = math.floor(amount * ALPHA_PER_SAMPLE + 0.5)
+
+				if alpha > 255 then
+					alpha = 255
+				end
+
+				if alpha > 0 then
+					buffer.writeu32(atlas, (row_offset + px) * 4, WHITE_RGB + alpha * 16777216)
+				end
 			end
 		end
 	end
 end
 
-local function unique_codepoints(charset: string): { number }
+local destroy = function(self: Font): ()
+	if not self.destroyed then
+		self.destroyed = true
+		self.texture:Destroy()
+	end
+end
+
+font.new = function(atlas: Texture, glyphs: Types.GlyphInput, line_height: number, options: Options?): Font
+	assert(not atlas.destroyed, "Font.New expects a live texture atlas")
+	assert(line_height > 0, "Font.New expects a positive line height")
+
+	local settings: Options = options or {}
+	local normalized: GlyphMap = {}
+
+	for key, glyph in glyphs do
+		local codepoint = if type(key) == "number" then key else utf8.codepoint(key)
+		normalized[codepoint] = glyph
+	end
+
+	return {
+		texture = atlas,
+		glyphs = normalized,
+		line_height = math.floor(line_height),
+		spacing = settings.spacing or 0,
+		fallback = settings.fallback or QUESTION_MARK,
+		destroyed = false,
+		Destroy = destroy,
+	}
+end
+
+font.from_buffer = function(
+	font_buffer: buffer,
+	pixel_size: number,
+	charset: string?,
+	options: Options?
+): Font
+	assert(buffer.len(font_buffer) >= 12, "Font.FromBuffer expects a non-empty binary font buffer")
+	assert(
+		pixel_size >= MIN_PIXEL_SIZE and pixel_size <= MAX_PIXEL_SIZE,
+		`Font.FromBuffer pixel_size must be between {MIN_PIXEL_SIZE} and {MAX_PIXEL_SIZE}`
+	)
+
+	local size = math.floor(pixel_size)
+	local file = parse_font(font_buffer)
+	local scale = size / file.units_per_em
+	local line_height = math.max(1, math.ceil((file.ascender - file.descender) * scale))
+
 	local seen: { [number]: boolean } = {}
 	local codepoints: { number } = {}
 
-	for _, codepoint in utf8.codes(charset) do
+	for _, codepoint in utf8.codes(charset or DEFAULT_CHARSET) do
 		if not seen[codepoint] then
 			seen[codepoint] = true
-
 			table.insert(codepoints, codepoint)
 		end
 	end
@@ -646,16 +808,7 @@ local function unique_codepoints(charset: string): { number }
 		table.insert(codepoints, QUESTION_MARK)
 	end
 
-	return codepoints
-end
-
-local function build_atlas(data: buffer, pixel_size: number, charset: string): (Texture, GlyphMap, number)
-	local file = parse_font(data)
-	local scale = pixel_size / file.units_per_em
-	local line_height = math.max(1, math.ceil((file.ascender - file.descender) * scale))
-	local codepoints = unique_codepoints(charset)
-
-	local cell_width = math.max(4, math.ceil(pixel_size * 1.5) + 2 * GLYPH_PADDING)
+	local cell_width = math.max(4, math.ceil(size * 1.5) + 2 * GLYPH_PADDING)
 	local cell_height = line_height + 2 * GLYPH_PADDING
 	local columns = math.max(1, MAX_ATLAS_WIDTH // cell_width)
 	local atlas_width = columns * cell_width
@@ -663,8 +816,15 @@ local function build_atlas(data: buffer, pixel_size: number, charset: string): (
 
 	assert(atlas_width * atlas_height <= MAX_ATLAS_PIXELS, "Font atlas is too large; reduce pixel_size or the charset")
 
-	local atlas = buffer.create(atlas_width * atlas_height * 4)
+	local atlas = buffer.create(atlas_width * atlas_height * BYTES_PER_PIXEL)
 	local glyphs: GlyphMap = {}
+	local edges: EdgeBuffer = {
+		count = 0,
+		from_x = {},
+		from_y = {},
+		to_x = {},
+		to_y = {},
+	}
 
 	for position, codepoint in codepoints do
 		local glyph_index = glyph_index_for(file, codepoint)
@@ -682,7 +842,8 @@ local function build_atlas(data: buffer, pixel_size: number, charset: string): (
 			table.insert(polygons, contour_to_polygon(contour))
 		end
 
-		rasterize_glyph(atlas, atlas_width, cell_x, cell_y, width, height, polygons, x_min, y_max, scale)
+		build_edges(edges, polygons, x_min, y_max, scale)
+		rasterize_glyph(atlas, atlas_width, cell_x, cell_y, width, height, edges)
 
 		glyphs[codepoint] = {
 			x = cell_x + 1,
@@ -695,131 +856,54 @@ local function build_atlas(data: buffer, pixel_size: number, charset: string): (
 		}
 	end
 
-	return texture_module.New(atlas_width, atlas_height, atlas, false), glyphs, line_height
+	return font.new(texture_module.new(atlas_width, atlas_height, atlas, false), glyphs, line_height, options)
 end
 
---[=[
-	Creates a bitmap font from a texture atlas and glyph metrics.
-
-	@within Font
-	@param atlas Texture -- Glyph atlas.
-	@param glyphs { [string | number]: Glyph } -- Keyed by character or codepoint.
-	@param line_height number -- Line height in pixels.
-	@param options Options? -- `spacing` and `fallback` (codepoint, defaults to `?`).
-	@return Font
-]=]
-font.New = function(atlas: Texture, glyphs: Types.GlyphInput, line_height: number, options: Options?): Font
-	assert(not atlas.destroyed, "Font.New expects a live texture atlas")
-	assert(line_height > 0, "Font.New expects a positive line height")
-
-	local settings: Options = options or {}
-
-	local normalized: GlyphMap = {}
-
-	for key, glyph in glyphs do
-		local codepoint = if type(key) == "number" then key else utf8.codepoint(key)
-		normalized[codepoint] = glyph
-	end
-
-	local instance = {
-		texture = atlas,
-		glyphs = normalized,
-		line_height = math.floor(line_height),
-		spacing = settings.spacing or 0,
-		fallback = settings.fallback or QUESTION_MARK,
-		destroyed = false,
-	}
-
-	return setmetatable(instance, font) :: any
-end
-
---[=[
-	Loads a TrueType-outline font from a buffer and rasterizes `charset` into a bitmap atlas.
-	This is CPU-heavy: call it once during initialization, never per frame.
-
-	@within Font
-	@param font_buffer buffer -- Raw `.ttf` file bytes.
-	@param pixel_size number -- Rasterization size in pixels, 4..128.
-	@param charset string? -- UTF-8 characters to rasterize. Defaults to printable ASCII.
-	@param options Options? -- `spacing` and `fallback`.
-	@return Font
-]=]
-font.FromBuffer = function(font_buffer: buffer, pixel_size: number, charset: string?, options: Options?): Font
-	assert(buffer.len(font_buffer) >= 12, "Font.FromBuffer expects a non-empty binary font buffer")
+font.from_string = function(font_data: string, pixel_size: number, charset: string?, options: Options?): Font
 	assert(
-		pixel_size >= MIN_PIXEL_SIZE and pixel_size <= MAX_PIXEL_SIZE,
-		`Font.FromBuffer pixel_size must be between {MIN_PIXEL_SIZE} and {MAX_PIXEL_SIZE}`
+		type(font_data) == "string" and #font_data >= 12,
+		"Font.FromString expects a non-empty binary font string"
 	)
 
-	local atlas, glyphs, line_height = build_atlas(font_buffer, math.floor(pixel_size), charset or DEFAULT_CHARSET)
-
-	return font.New(atlas, glyphs, line_height, options)
+	return font.from_buffer(buffer.fromstring(font_data), pixel_size, charset, options)
 end
 
---[=[
-	Loads a TrueType-outline font from a binary string (raw bytes, not Base64).
-
-	@within Font
-	@param font_data string -- Raw `.ttf` file bytes.
-	@param pixel_size number -- Rasterization size in pixels, 4..128.
-	@param charset string? -- UTF-8 characters to rasterize. Defaults to printable ASCII.
-	@param options Options? -- `spacing` and `fallback`.
-	@return Font
-]=]
-font.FromString = function(font_data: string, pixel_size: number, charset: string?, options: Options?): Font
-	assert(type(font_data) == "string" and #font_data >= 12, "Font.FromString expects a non-empty binary font string")
-
-	return font.FromBuffer(buffer.fromstring(font_data), pixel_size, charset, options)
-end
-
---[=[
-	Releases the atlas texture owned by this font.
-
-	@within Font
-]=]
-font.Destroy = function(self: Font): ()
-	if not self.destroyed then
-		self.destroyed = true
-		self.texture:Destroy()
-	end
-end
-
-local function glyph_advance(glyph: Glyph): number
-	return glyph.xadvance or glyph.width
-end
-
---[[
-	Lays out `value` starting at (x, y). When `context` is given, glyphs are drawn into it.
-	Returns the text width and height in pixels.
-]]
-local function layout_text(
+local layout_text = function(
 	instance: Font,
 	value: string,
+	scale: number,
 	x: number,
 	y: number,
-	scale: number,
 	context: Context?,
-	color32: number
-): (number, number)
+	tint: number?,
+	viewport_x0: number,
+	viewport_y0: number,
+	viewport_x1: number,
+	viewport_y1: number
+): (number, number, number, number, number, number, number)
 	local glyphs = instance.glyphs
 	local fallback = glyphs[instance.fallback]
 	local line_height = math.floor(instance.line_height * scale + 0.5)
 	local spacing = instance.spacing * scale
-
 	local space = glyphs[SPACE] or fallback
-	local space_advance = if space then glyph_advance(space) else instance.line_height * 0.5
+	local space_advance = if space ~= nil then (space.xadvance or space.width) else instance.line_height * 0.5
 	local tab_advance = (space_advance * scale + spacing) * TAB_WIDTH_IN_SPACES
 
 	local cursor_x, cursor_y = x, y
 	local max_width = 0
 	local line_count = 1
 	local glyph_count = 0
-	local min_x, min_y, max_x, max_y = math.huge, math.huge, -math.huge, -math.huge
-	local draw_options: Types.TextureDrawOptions = { tint = color32, blend = true }
+	local touch_left, touch_top = math.huge, math.huge
+	local touch_right, touch_bottom = -math.huge, -math.huge
 
 	for _, codepoint in utf8.codes(value) do
 		if codepoint == NEWLINE then
-			max_width = math.max(max_width, cursor_x - x)
+			local line_width = cursor_x - x
+
+			if line_width > max_width then
+				max_width = line_width
+			end
+
 			cursor_x = x
 			cursor_y += line_height
 			line_count += 1
@@ -828,54 +912,69 @@ local function layout_text(
 		else
 			local glyph = glyphs[codepoint] or fallback
 
-			if glyph then
-				if context and glyph.width > 0 and glyph.height > 0 then
+			if glyph ~= nil then
+				glyph_count += 1
+
+				if context ~= nil and glyph.width > 0 and glyph.height > 0 then
 					local gx = math.floor(cursor_x + (glyph.xoffset or 0) * scale + 0.5)
 					local gy = math.floor(cursor_y + (glyph.yoffset or 0) * scale + 0.5)
 					local gw = math.max(1, math.floor(glyph.width * scale + 0.5))
 					local gh = math.max(1, math.floor(glyph.height * scale + 0.5))
+					local left, top, right, bottom = texture_module._DrawGlyph(
+						context,
+						instance.texture,
+						glyph.x,
+						glyph.y,
+						glyph.width,
+						glyph.height,
+						gx,
+						gy,
+						gw,
+						gh,
+						tint or OPAQUE_WHITE,
+						viewport_x0,
+						viewport_y0,
+						viewport_x1,
+						viewport_y1
+					)
 
-					draw_options.source_x, draw_options.source_y = glyph.x, glyph.y
-					draw_options.source_width, draw_options.source_height = glyph.width, glyph.height
-					texture_module._DrawRegion(context, instance.texture, gx, gy, gw, gh, draw_options, false)
-
-					min_x, min_y = math.min(min_x, gx), math.min(min_y, gy)
-					max_x, max_y = math.max(max_x, gx + gw - 1), math.max(max_y, gy + gh - 1)
+					if right >= left then
+						if left < touch_left then
+							touch_left = left
+						end
+						if top < touch_top then
+							touch_top = top
+						end
+						if right > touch_right then
+							touch_right = right
+						end
+						if bottom > touch_bottom then
+							touch_bottom = bottom
+						end
+					end
 				end
 
-				cursor_x += glyph_advance(glyph) * scale + spacing
-				glyph_count += 1
+				cursor_x += (glyph.xadvance or glyph.width) * scale + spacing
 			end
 		end
 	end
 
-	if context then
-		if min_x ~= math.huge then
-			context:_MarkDirtyRect(min_x, min_y, max_x, max_y)
-		end
+	local line_width = cursor_x - x
 
-		context.stats.text_glyphs += glyph_count
+	if line_width > max_width then
+		max_width = line_width
 	end
 
-	max_width = math.max(max_width, cursor_x - x)
-
-	return math.floor(max_width + 0.5), line_count * line_height
+	return math.floor(max_width + 0.5),
+		line_count * line_height,
+		glyph_count,
+		touch_left,
+		touch_top,
+		touch_right,
+		touch_bottom
 end
 
---[=[
-	Draws UTF-8 text with a bitmap font. `\n` starts a new line and `\t` advances four spaces.
-
-	@within Font
-	@param context Bloom
-	@param instance Font
-	@param value string
-	@param x number -- Left, 1-based.
-	@param y number -- Top, 1-based.
-	@param color32 number? -- Packed RGBA tint. Defaults to opaque white.
-	@param scale number? -- Defaults to 1.
-	@return (number, number) -- Text width and height in pixels.
-]=]
-font.DrawText = function(
+font.draw_text = function(
 	context: Context,
 	instance: Font,
 	value: string,
@@ -884,28 +983,59 @@ font.DrawText = function(
 	color32: number?,
 	scale: number?
 ): (number, number)
+	local resolved_scale = scale or 1
+	local resolved_color = color32 or OPAQUE_WHITE
+
 	assert(type(value) == "string", "DrawText expects a string")
-	local text_scale = scale or 1
-	assert(text_scale > 0, "DrawText expects a positive scale")
+	assert(resolved_scale > 0, "DrawText expects a positive scale")
 
 	if context._destroyed or instance.destroyed then
 		return 0, 0
 	end
 
-	return layout_text(instance, value, math.floor(x), math.floor(y), text_scale, context, color32 or 0xFFFFFFFF)
+	local viewport_x0, viewport_y0, viewport_x1, viewport_y1 = clip.viewport(context)
+	local width, height, glyph_count, touch_left, touch_top, touch_right, touch_bottom =
+		layout_text(
+			instance,
+			value,
+			resolved_scale,
+			x,
+			y,
+			context,
+			resolved_color,
+			viewport_x0,
+			viewport_y0,
+			viewport_x1,
+			viewport_y1
+		)
+
+	context.stats.text_glyphs += glyph_count
+
+	if touch_right >= touch_left then
+		damage.mark_rect(context, touch_left, touch_top, touch_right, touch_bottom)
+	end
+
+	return width, height
 end
 
---[=[
-	Measures text without drawing it. Uses the same layout rules as `DrawText`.
+font.measure_text = function(instance: Font, value: string, scale: number?): (number, number)
+	local resolved_scale = scale or 1
 
-	@within Font
-	@param instance Font
-	@param value string
-	@param scale number? -- Defaults to 1.
-	@return (number, number) -- Text width and height in pixels.
-]=]
-font.MeasureText = function(instance: Font, value: string, scale: number?): (number, number)
-	return layout_text(instance, value, 0, 0, scale or 1, nil, 0)
+	assert(type(value) == "string", "MeasureText expects a string")
+	assert(resolved_scale > 0, "MeasureText expects a positive scale")
+
+	local width, height = layout_text(instance, value, resolved_scale, 0, 0, nil, nil, 0, 0, 0, 0)
+
+	return width, height
 end
+
+font.destroy = destroy
+
+font.New = font.new
+font.FromBuffer = font.from_buffer
+font.FromString = font.from_string
+font.DrawText = font.draw_text
+font.MeasureText = font.measure_text
+font.Destroy = destroy
 
 return font

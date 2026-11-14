@@ -9,20 +9,14 @@
 	Low-level graphics library for EditableImage
 ]]
 
+--!native
+--!optimize 2
 --!strict
 
-local asset_service = game:GetService("AssetService")
+local platform = require("./platform")
+local types = require("./types")
 
-export type Status = "supported" | "disabled" | "out_of_memory"
-
-export type Report = {
-	supported: boolean,
-	status: Status,
-	message: string,
-	details: string?,
-}
-
-local PROBE_SIZE = Vector2.one
+local PROBE_SIZE = 1
 local PROBE_BYTES = 4
 
 local DISABLED_MESSAGE = table.concat({
@@ -35,20 +29,13 @@ local DISABLED_MESSAGE = table.concat({
 local OUT_OF_MEMORY_MESSAGE =
 	"Bloom: EditableImage memory budget is exhausted on this device; destroy unused EditableImages and try again."
 
---[=[
-	@class Support
+local SUPPORTED_MESSAGE = "Bloom: EditableImage is available."
 
-	Checks whether this experience may use `EditableImage` before Bloom allocates any tiles.
+local SERVICE_MESSAGE = "Bloom: AssetService:CreateEditableImage is unavailable in this environment."
 
-	Roblox disables the Mesh / Image APIs by default for published experiences. Creating,
-	writing and reading an image can each fail independently, so the probe exercises all three
-	on a 1x1 image and destroys it afterwards.
-]=]
-local support = {}
+local cached: types.SupportReport? = nil
 
-local cached_report: Report? = nil
-
-local function report(status: Status, message: string, details: string?): Report
+local report = function(status: types.SupportStatus, message: string, details: string?): types.SupportReport
 	return table.freeze({
 		supported = status == "supported",
 		status = status,
@@ -57,85 +44,92 @@ local function report(status: Status, message: string, details: string?): Report
 	})
 end
 
-local function exercise(editable: EditableImage): buffer
-	editable:WritePixelsBuffer(Vector2.zero, PROBE_SIZE, buffer.create(PROBE_BYTES))
+local exercise = function(editable: any): string?
+	local position = platform.vector2(0, 0)
+	local size = platform.vector2(PROBE_SIZE, PROBE_SIZE)
+	editable:WritePixelsBuffer(position, size, buffer.create(PROBE_BYTES))
+	local read_back = editable:ReadPixelsBuffer(position, size)
 
-	return editable:ReadPixelsBuffer(Vector2.zero, PROBE_SIZE)
+	if read_back == nil then
+		return "Bloom: EditableImage probe read back no pixel data."
+	end
+
+	local length = buffer.len(read_back)
+
+	if length ~= PROBE_BYTES then
+		return `Bloom: EditableImage probe read back {length} bytes; expected {PROBE_BYTES}.`
+	end
+
+	return nil
 end
 
-local function probe(): Report
-	local created, result = pcall(asset_service.CreateEditableImage, asset_service, { Size = PROBE_SIZE })
+local probe = function(): types.SupportReport
+	local found, service = pcall(platform.service, "AssetService")
+
+	if not found then
+		return report("disabled", DISABLED_MESSAGE, tostring(service))
+	end
+
+	if service == nil or type(service.CreateEditableImage) ~= "function" then
+		return report("disabled", DISABLED_MESSAGE, SERVICE_MESSAGE)
+	end
+
+	local created, result =
+		pcall(service.CreateEditableImage, service, { Size = platform.vector2(PROBE_SIZE, PROBE_SIZE) })
 
 	if not created then
 		return report("disabled", DISABLED_MESSAGE, tostring(result))
 	end
 
-	local editable: EditableImage? = result
-
-	if editable == nil then
+	if result == nil then
 		return report("out_of_memory", OUT_OF_MEMORY_MESSAGE)
 	end
 
-	local usable, result_or_error = pcall(exercise, editable)
-	editable:Destroy()
+	local ok, problem = pcall(exercise, result)
+	pcall(result.Destroy, result)
 
-	if not usable then
-		return report("disabled", DISABLED_MESSAGE, tostring(result_or_error))
+	if not ok then
+		return report("disabled", DISABLED_MESSAGE, tostring(problem))
 	end
 
-	return report("supported", "Bloom: EditableImage is available.")
+	if problem ~= nil then
+		return report("disabled", DISABLED_MESSAGE, problem)
+	end
+
+	return report("supported", SUPPORTED_MESSAGE)
 end
 
---[=[
-	Probes the EditableImage API. A successful result is cached; failures are re-checked on the
-	next call because the memory budget can recover.
+local support = {}
 
-	@within Support
-	@return Report -- `supported`, `status` ("supported" | "disabled" | "out_of_memory"), `message`, `details`.
-]=]
-support.Check = function(): Report
-	if cached_report ~= nil then
-		return cached_report
+support.check = function(): types.SupportReport
+	if cached ~= nil then
+		return cached
 	end
 
 	local result = probe()
 
 	if result.supported then
-		cached_report = result
+		cached = result
 	end
 
 	return result
 end
 
---[=[
-	Returns true when EditableImage can be created, written and read.
-
-	@within Support
-	@return boolean
-]=]
-support.IsSupported = function(): boolean
-	return support.Check().supported
+support.is_supported = function(): boolean
+	return support.check().supported
 end
 
---[=[
-	Raises the report's message unless EditableImage is available.
+support.assert_supported = function(): ()
+	local result = support.check()
 
-	@within Support
-]=]
-support.Assert = function(): ()
-	local result = support.Check()
 	if not result.supported then
-		local suffix = if result.details then ` ({result.details})` else ""
-		error(result.message .. suffix, 3)
+		local details = result.details
+		error(if details ~= nil then `{result.message} ({details})` else result.message, 3)
 	end
 end
 
---[=[
-	@private
-	Forgets the cached result. Used by tests.
-]=]
-support._Reset = function(): ()
-	cached_report = nil
+support.reset = function(): ()
+	cached = nil
 end
 
 return support

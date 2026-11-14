@@ -14,87 +14,130 @@
 --!strict
 
 local Types = require("../types")
-type Context = Types.self
+
+type Context = Types.Context
 
 local pixel = {}
 
-local function pixel_offset(context: Context, x: number, y: number): number
-	return ((y - 1) * context.res_x + (x - 1)) * 4
-end
+local floor = math.floor
+local huge = math.huge
+local writeu32 = buffer.writeu32
+local readu32 = buffer.readu32
 
-local function is_inside_viewport(context: Context, x: number, y: number): boolean
-	local viewport = context.state.viewport
-
-	return x >= viewport.x and x < viewport.x + viewport.w and y >= viewport.y and y < viewport.y + viewport.h
-end
-
-local function is_inside_framebuffer(context: Context, x: number, y: number): boolean
-	return x >= 1 and x <= context.res_x and y >= 1 and y <= context.res_y
-end
-
---[=[
-	Draws one pixel. Coordinates outside the viewport or framebuffer are ignored.
-
-	@within Bloom
-	@param x number -- 1-based column.
-	@param y number -- 1-based row.
-	@param color32 number -- Packed RGBA color.
-]=]
-pixel.DrawPixel = function(self: Context, x: number, y: number, color32: number): ()
-	x, y = math.floor(x), math.floor(y)
-
-	if not is_inside_viewport(self, x, y) or not is_inside_framebuffer(self, x, y) then
+pixel.draw = function(context: Context, x: number, y: number, color: number): ()
+	if context._destroyed then
 		return
 	end
 
-	buffer.writeu32(self.pixel_buffer, pixel_offset(self, x, y), color32)
-	self:_MarkDirty(x, y)
+	local pixel_x = floor(x)
+	local pixel_y = floor(y)
+	local viewport = context.state.viewport
+
+	if pixel_x < viewport.x or pixel_y < viewport.y then
+		return
+	end
+	if pixel_x >= viewport.x + viewport.w or pixel_y >= viewport.y + viewport.h then
+		return
+	end
+
+	writeu32(context.pixel_buffer, ((pixel_y - 1) * context.res_x + pixel_x - 1) * 4, color)
+	context._clear_color_applied = huge
+
+	local tile_index = context._col_tile[pixel_x] + context._row_base[pixel_y]
+	local tile = context.tiles[tile_index]
+	if tile.dirty_full then
+		return
+	end
+
+	local had_damage = tile.dmin_x <= tile.dmax_x and tile.dmin_y <= tile.dmax_y
+	local local_x = context._col_local[pixel_x]
+	local local_y = context._row_local[pixel_y]
+
+	if local_x < tile.dmin_x then
+		tile.dmin_x = local_x
+	end
+	if local_y < tile.dmin_y then
+		tile.dmin_y = local_y
+	end
+	if local_x > tile.dmax_x then
+		tile.dmax_x = local_x
+	end
+	if local_y > tile.dmax_y then
+		tile.dmax_y = local_y
+	end
+
+	if not had_damage then
+		local dirty_tiles = context._dirty_tiles
+
+		if dirty_tiles ~= nil and not dirty_tiles[tile_index] then
+			dirty_tiles[tile_index] = true
+			context._dirty_list[#context._dirty_list + 1] = tile_index
+		end
+	end
 end
 
---[=[
-	Reads one pixel. Returns `0` outside the framebuffer.
+pixel.draw_unsafe = function(context: Context, x: number, y: number, color: number): ()
+	if context._destroyed then
+		return
+	end
 
-	@within Bloom
-	@param x number -- 1-based column.
-	@param y number -- 1-based row.
-	@return number -- Packed RGBA color.
-]=]
-pixel.ReadPixel = function(self: Context, x: number, y: number): number
-	x, y = math.floor(x), math.floor(y)
+	local pixel_x = floor(x)
+	local pixel_y = floor(y)
 
-	if not is_inside_framebuffer(self, x, y) then
+	writeu32(context.pixel_buffer, ((pixel_y - 1) * context.res_x + pixel_x - 1) * 4, color)
+	context._clear_color_applied = huge
+
+	local tile_index = context._col_tile[pixel_x] + context._row_base[pixel_y]
+	local tile = context.tiles[tile_index]
+	if tile.dirty_full then
+		return
+	end
+
+	local had_damage = tile.dmin_x <= tile.dmax_x and tile.dmin_y <= tile.dmax_y
+	local local_x = context._col_local[pixel_x]
+	local local_y = context._row_local[pixel_y]
+
+	if local_x < tile.dmin_x then
+		tile.dmin_x = local_x
+	end
+	if local_y < tile.dmin_y then
+		tile.dmin_y = local_y
+	end
+	if local_x > tile.dmax_x then
+		tile.dmax_x = local_x
+	end
+	if local_y > tile.dmax_y then
+		tile.dmax_y = local_y
+	end
+
+	if not had_damage then
+		local dirty_tiles = context._dirty_tiles
+
+		if dirty_tiles ~= nil and not dirty_tiles[tile_index] then
+			dirty_tiles[tile_index] = true
+			context._dirty_list[#context._dirty_list + 1] = tile_index
+		end
+	end
+end
+
+pixel.read = function(context: Context, x: number, y: number): number
+	local pixel_x = floor(x)
+	local pixel_y = floor(y)
+
+	if pixel_x < 1 or pixel_y < 1 or pixel_x > context.res_x or pixel_y > context.res_y then
 		return 0
 	end
 
-	return buffer.readu32(self.pixel_buffer, pixel_offset(self, x, y))
+	return readu32(context.pixel_buffer, ((pixel_y - 1) * context.res_x + pixel_x - 1) * 4)
 end
 
---[=[
-	Draws a pixel without bounds checks. `x` and `y` must be integers inside the framebuffer.
+pixel.read_unsafe = function(context: Context, x: number, y: number): number
+	local pixel_x = floor(x)
+	local pixel_y = floor(y)
 
-	@within Bloom
-	@param x number
-	@param y number
-	@param color32 number
-]=]
-pixel.DrawPixelUnsafe = function(self: Context, x: number, y: number, color32: number): ()
-	buffer.writeu32(self.pixel_buffer, pixel_offset(self, x, y), color32)
-
-	local tile_x = (x - 1) // self.tile_size
-	local tile_y = (y - 1) // self.tile_size
-	self._dirty_tiles[tile_x + tile_y * self.size_x] = true
-end
-
---[=[
-	Reads a pixel without bounds checks. `x` and `y` must be integers inside the framebuffer.
-
-	@within Bloom
-	@param x number
-	@param y number
-	@return number
-]=]
-pixel.ReadPixelUnsafe = function(self: Context, x: number, y: number): number
-	return buffer.readu32(self.pixel_buffer, pixel_offset(self, x, y))
+	return readu32(context.pixel_buffer, ((pixel_y - 1) * context.res_x + pixel_x - 1) * 4)
 end
 
 return pixel
+
+

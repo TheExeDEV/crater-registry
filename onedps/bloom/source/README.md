@@ -1,8 +1,10 @@
-
-
 # Bloom
 
-Bloom is a low-level graphics library for Roblox built around `EditableImage` and `buffer`. The API is inspired by OpenGL's context/state/pipeline model, but it does **not** run GPU shaders. It keeps RGBA pixels in a Luau buffer and uploads changed regions to Roblox `EditableImage` objects.
+Bloom is a low-level graphics library for Roblox built around `EditableImage` and `buffer`. The API is inspired by OpenGL's context/state/pipeline model, but it does **not** run GPU shaders. It keeps RGBA pixels in a Luau buffer and uploads damage-tracked regions to Roblox `EditableImage` objects.
+
+## Bloom 2.0
+
+Version 2.0.0 is a full internal rewrite. One flat RGBA framebuffer is now the source of truth, tiles only present it through `EditableImage`, and every primitive writes through one exact-damage path. The hidden pixel, text, triangle and `EachPixel` caches are gone: repeating a draw call always draws. The public API and documented behaviour are unchanged apart from the fixes listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Quick start
 
@@ -27,7 +29,7 @@ canvas:DrawLine(1, 1, 512, 512, Color4.New32Bit(255, 255, 255, 255))
 canvas:EndFrame(true)
 ```
 
-Enable **Experience Settings → Security → Allow Mesh / Image APIs** for published experiences. `Bloom.Create` probes the API first and raises a descriptive error when it is disabled; call `Bloom.CheckSupport()` (returns `{ supported, status, message, details }`, where `status` is `"supported"`, `"disabled"` or `"out_of_memory"`) or `Bloom.IsSupported()` to check without creating a canvas. Roblox restricts editable image access and memory use:
+Enable **Experience Settings > Security > Allow Mesh / Image APIs** for published experiences. `Bloom.Create` probes the API first and raises a descriptive error when it is disabled; call `Bloom.CheckSupport()` (returns `{ supported, status, message, details }`, where `status` is `"supported"`, `"disabled"` or `"out_of_memory"`) or `Bloom.IsSupported()` to check without creating a canvas. Roblox restricts editable image access and memory use:
 
 - every `EditableImage` is at most 1024×1024, so Bloom splits larger framebuffers into tiles (`tile_size`, default 1024);
 - `AssetService:CreateEditableImage()` returns `nil` when the device's editable memory budget is exhausted - Bloom then raises a clear error and releases the tiles it already created;
@@ -39,11 +41,12 @@ Enable **Experience Settings → Security → Allow Mesh / Image APIs** for publ
 
 - **Context** - `Bloom.Create()` owns the CPU framebuffer, tile resources, state, scheduler and pipeline.
 - **State** - `SetViewport()`, `ResetViewport()`, `SetClearColor()`.
-- **Draw commands** - pixels, lines, rectangles, triangles, textures and bitmap text.
+- **Draw commands** - pixels, lines, rectangles, triangles, circles, convex polygons, textures and bitmap text.
+- **`EachPixel()`** - runs its callback on every visit, with no read-only cache; it marks the exact bounding box of the pixels that actually changed.
 - **CPU shaders** - `Bloom.CreateShader()` and `canvas:ApplyShader()` transform pixels in a chosen rectangle.
-- **Presentation** - `Update()` uploads dirty tiles immediately; `UpdateAsync()` queues tile uploads through an independent cooperative worker loop, without connecting to frame or physics events.
+- **Presentation** - `Update()` uploads the damaged rectangle of each dirty tile immediately; `UpdateAsync()` queues tile uploads through an independent cooperative worker loop, without connecting to frame or physics events.
 - **Open pipeline** - `RegisterStage(name, callback, order)` exposes lifecycle hooks for custom CPU work.
-- **Profiling** - `GetStats()` reports upload bytes/time, processed shader/texture pixels and glyph counts.
+- **Profiling** - `GetStats()` reports actual uploaded region bytes/time, processed shader/texture pixels and glyph counts.
 
 ## Textures
 
@@ -102,8 +105,8 @@ local font = Bloom.Font.FromString(
     " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,:-_"
 )
 
-canvas:DrawText(font, "Hello Bloom!", 12, 12, Color4.New32Bit(255, 255, 255, 255), 1)
-local width, height = Bloom.Font.MeasureText(font, "Hello Bloom!", 1)
+canvas:DrawText(font, "Bloom", 12, 12, Color4.New32Bit(255, 255, 255, 255), 1)
+local width, height = Bloom.Font.MeasureText(font, "Bloom", 1)
 font:Destroy()
 ```
 
@@ -156,31 +159,40 @@ canvas.async:Start()
 - Prefer opaque textures and `blend = false` when alpha blending is not required.
 - Restrict shaders to the smallest rectangle possible; a full 1024×1024 shader calls Luau code over one million times.
 - Prefer rectangles or texture blits to thousands of individual `DrawPixel()` calls.
+- Sparse updates benefit from damage tracking: each dirty tile uploads only the bounding rectangle of its marks. A one-pixel change can therefore cost 4 uploaded bytes instead of a whole tile. Marks that are far apart still share one per-tile bounding box, so locality matters.
+- `Clear()` and `BeginFrame(clear_color)` change every pixel and mark every tile full. The next upload is full-tile no matter how small the previous damage was; sparse upload helps retained or partially redrawn frames, not full clears.
 - Use `UpdateAsync()` to spread tile uploads across scheduler steps, but remember that it spreads work rather than making a single upload cheaper.
 - Reuse `Texture` and `Font` objects instead of rebuilding atlases per frame.
-- `GetStats()` returns counters; use Roblox MicroProfiler/Script Profiler for device-specific timing.
+- `GetStats().uploaded_bytes` counts bytes actually written for the uploaded regions, not full tile sizes. Full-tile uploads still count full tile bytes, so full-frame behavior is unchanged.
+- `GetStats()` returns counters; use Roblox MicroProfiler/Script Profiler for device-specific timing. The repository's sparse/full upload benchmarks measure upload paths, not end-to-end frame time on every device.
 - `EditableImage` display updates are rate-limited by Roblox. Tiling helps manage larger CPU framebuffers, but it does not turn the API into an unrestricted GPU upload queue.
+
+## Full HD example
+
+A 1920 × 1080 canvas with the default `tile_size = 1024` is split into four tiles: `1024×1024`, `896×1024`, `1024×56`, `896×56`. A full-frame upload is **8,294,400 bytes**, while a sparse 1 × 1 update is **4 bytes**. `Clear()` and a full-frame `MarkDirty` still upload all four tiles; damage tracking helps retained or partially redrawn frames, not full clears.
 
 ## Coordinate and ownership rules
 
-- Coordinates are 1-based and rectangle endpoints are inclusive.
+- Coordinates are 1-based and rectangle endpoints are inclusive. Fractional coordinates are rounded down before tiling and uploading.
 - Pixel bytes are RGBA, as in `EditableImage:ReadPixelsBuffer()`. Packed colors use `Color4.New32Bit(r, g, b, a?)`; alpha defaults to 255.
-- `GetBuffer()` returns the live framebuffer. After direct buffer writes, call `MarkDirty(x0, y0, x1, y1)`.
+- `GetBuffer()` returns Bloom's CPU framebuffer (for `FromEditableImage()`, the snapshot taken at wrap time, not the external image). After direct buffer writes, call `MarkDirty(x0, y0, x1, y1)`. `MarkDirty` is authoritative: the marked rectangle is the upload region, so it must cover every pixel you wrote directly. Calling `GetBuffer()` also disables the no-op fast path for repeated same-color `Clear()`.
+- `MarkDirty()` floors and clamps its rectangle to the framebuffer. Marks in one tile accumulate into a single bounding rectangle; a full-frame mark uploads every tile fully.
 - `DrawPixelUnsafe()` and `ReadPixelUnsafe()` skip bounds checks and rounding; use only with valid integer coordinates.
-- `Resize()` discards existing pixels and recreates owned presentation resources. Resizing a `FromEditableImage()` wrapper is intentionally rejected because the wrapped image is externally owned.
+- `FromEditableImage()` starts clean, owns no `EditableImage` or `ImageLabel`, and leaves the supplied image and holder alive after `Destroy()`. Do not mutate the external image while it is wrapped: Bloom works from its own snapshot and overwrites the external image on upload.
+- `tile_size` is rounded down and clamped to `2..1024`. Bloom may raise it automatically to keep the tile count at or below 4096; if 1024 still needs more tiles, `Create`/`Resize` raises a `needs more than 4096 tiles` error. The lower bound is only a guard, but a tile of `2` still creates a very large number of `EditableImage` objects, so keep `tile_size` reasonably large.
+- `Resize()` is atomic: new tiles and the new framebuffer are allocated first, and a failure leaves the old canvas and its picture usable. On success the existing pixels are discarded and owned presentation resources are recreated. Resizing a `FromEditableImage()` wrapper is intentionally rejected because the wrapped image is externally owned. `Resize()` and `Destroy()` release the upload scratch and staging buffers.
 - Call `Destroy()` when finished to release owned `EditableImage` objects, cloned labels and scheduler workers.
 
 ## Development
 
-Tools are pinned in `rokit.toml` (`lune`, `luau-lsp`).
+Tests and benchmarks run with [Lune](https://lune-org.github.io/docs) 0.10.5:
 
 ```bash
-rokit install
-luau-lsp analyze --platform=roblox --definitions=<path to globalTypes.d.luau> src
-lune run tests/run
+lune run tests/run.luau
+lune run bench/run.luau
 ```
 
-`tests/roblox_mock.luau` loads the modules with Roblox's require-by-string rules and mocks `AssetService`/`EditableImage` according to their documented contract (size limit, `nil` on exhausted budget, 4 bytes per pixel).
+`tests/mock.luau` installs the Roblox globals (`AssetService`, `EditableImage`, `ImageLabel`, `Content`, `Vector2`, `UDim2`) and follows the documented contract (1024×1024 limit, `nil` on an exhausted budget, 4 bytes per pixel). Benchmarks print ops/sec and elapsed milliseconds per case. The TTF atlas case is skipped unless `BLOOM_TEST_FONT` points to a `.ttf` file.
 
 ## Documentation
 
@@ -190,4 +202,4 @@ The same docs are published at **https://framebuffer-studio.github.io/Bloom/**: 
 
 ## Luau types
 
-Public option tables are explicitly typed (`Bloom.Options`, `Bloom.SubmitOptions`, `Bloom.Texture.DrawOptions`, `Bloom.Font.Options`). See [docs/en/14-types.md](docs/en/14-types.md) for examples.
+Public option tables are explicitly typed (`Bloom.Options`, `Bloom.SubmitOptions`, `Bloom.TextureDrawOptions`, `Bloom.FontOptions`). See [docs/en/14-types.md](docs/en/14-types.md) for examples.
