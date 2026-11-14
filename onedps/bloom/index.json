@@ -76,6 +76,42 @@
         ]
       },
       "scripts": []
+    },
+    {
+      "version": "1.5.0",
+      "sha256": "379fd48f1b46b82303e148e2911ff9a2df10c9c137e211f5608effd5fb209f57",
+      "published_at": "2026-11-14T19:09:32.7655038+00:00",
+      "manifest": {
+        "name": "onedps/bloom",
+        "authors": [
+          "onedps",
+          "TheExeDEV"
+        ],
+        "description": "Blossom with possibilities. Predictable API, high performance, and no limitations.",
+        "license": "Apache 2.0",
+        "version": "1.5.0",
+        "keywords": [
+          "EditableImage",
+          "buffer",
+          "Bloom",
+          "FrameBuffer"
+        ],
+        "registry": "https://github.com/TheExeDEV/crater-registry",
+        "repository": "https://github.com/FrameBuffer-Studio/Bloom/",
+        "can_publish": true,
+        "import_to": "shared",
+        "path_to_main": "src/init.luau",
+        "path_to_definition_files": [],
+        "import_client": [],
+        "import_server": [],
+        "import_develop": [],
+        "scripts": {},
+        "exclude": [
+          "docs/"
+        ]
+      },
+      "scripts": [],
+      "notes": "### Changed\n\n- The whole library was rewritten around one flat RGBA framebuffer. Tiles now exist only to present that buffer through `EditableImage`, and every primitive clips once, writes tight loops, and marks one exact damage rectangle.\n- `DrawPixel` is minimal again: floor, viewport check, one `writeu32`, one bounds update. The duplicated damage block and the hidden per-pixel caches are gone.\n- Exact per-tile damage replaced the 16-mark escalation heuristic. Uploads use the full tile only when the damaged rectangle covers it.\n- The TTF rasteriser uses scanline edge intersections instead of four winding tests per pixel. Glyph output can differ slightly from 1.5.0 in antialiasing detail.\n- Scaled texture blits precompute column and row sampling tables; texture draws and shaders use specialised 1:1, alpha, tinted/opacity and scaled paths with hoisted locals.\n- `Resize` is atomic: new resources are built first. A failure leaves the old canvas and its picture usable.\n- `Update`/`UpdateAsync` share one upload path with a generation guard, so stale async work cannot upload into a new tile generation. Async updates batch up to 16 tiles per scheduler task, and both paths visit only tiles on the dirty-tile list instead of scanning the whole grid.\n- `DrawText` hoists per-call text invariants and blits 1:1 glyphs through a dedicated fast path; scaled glyphs keep the general texture path.\n- The public API and documented behaviour are unchanged apart from the fixes below.\n\n### Fixed\n\n- Removed the read-only caches in `EachPixel`, `DrawText` and `DrawTriangle`. Repeated calls always execute.\n- `EachPixel` marks the exact bounding box of the pixels that actually changed, not the whole visited rectangle. A read-only pass schedules no upload and is never cached.\n- Pipeline stages are isolated with `pcall`: a failing stage warns and the remaining stages still run.\n- Custom shader errors propagate, and rows processed before the error stay marked for the next upload.\n- Triangles and glyphs mark the rectangle actually written, not the vertex or glyph box.\n- `Clear(0)` always wins over an earlier opaque clear; `GetBuffer()` still disables the repeated same-colour clear shortcut.\n\n### Added\n\n- `DrawCircle` and `DrawCircleAA` draw filled circles; the AA variant blends a one-pixel edge.\n- `DrawPolygon` fills a convex polygon as a triangle fan from an array of points or flat coordinates.\n- Tiles no longer keep a second CPU copy of their pixels: uploads stage each tile through one reusable buffer sized to the largest tile."
     }
   ]
 }
