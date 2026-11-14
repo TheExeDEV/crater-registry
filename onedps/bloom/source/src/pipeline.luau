@@ -9,120 +9,82 @@
 	Low-level graphics library for EditableImage
 ]]
 
+--!native
+--!optimize 2
 --!strict
 
 local Types = require("./types")
 
-export type Callback = Types.StageCallback
-export type Phase = Types.PipelinePhase
+local env: any = _G
 
-export type Stage = {
-	name: string,
-	callback: Callback,
-	order: number,
-	enabled: boolean,
+type Stage = Types.Stage
+type Callback = Types.StageCallback
+
+type Pipeline = {
+	stages: { Stage },
+	snapshot: { Stage },
+	version: number,
+	snapshot_version: number,
+	Register: (self: Pipeline, name: string, callback: Callback, order: number?) -> (),
+	Remove: (self: Pipeline, name: string) -> boolean,
+	SetEnabled: (self: Pipeline, name: string, enabled: boolean) -> boolean,
+	Run: (self: Pipeline, context: any, phase: string) -> (),
 }
 
 local DEFAULT_ORDER = 100
 
---[=[
-	@class Pipeline
-
-	Ordered, extensible hooks around Bloom's frame, shader and upload operations.
-]=]
-local pipeline = {}
-pipeline.__index = pipeline
-
-export type Pipeline = typeof(setmetatable({} :: { stages: { Stage } }, pipeline))
-
-local function compare_stages(a: Stage, b: Stage): boolean
+local compare = function(a: Stage, b: Stage): boolean
 	if a.order == b.order then
 		return a.name < b.name
 	end
-
 	return a.order < b.order
 end
 
-local function find_stage(self: Pipeline, name: string): (number?, Stage?)
+local find = function(self: Pipeline, name: string): (number?, Stage?)
 	for index, stage in self.stages do
 		if stage.name == name then
 			return index, stage
 		end
 	end
-
 	return nil, nil
 end
 
-local function remove_stage(self: Pipeline, name: string): boolean
-	local index = find_stage(self, name)
+local register = function(self: Pipeline, name: string, callback: Callback, order: number?): ()
+	assert(type(name) == "string" and name ~= "", "Pipeline.Register expects a non-empty name")
+	assert(type(callback) == "function", "Pipeline.Register expects a callback")
+
+	local stage: Stage = {
+		name = name,
+		callback = callback,
+		order = if order ~= nil then order else DEFAULT_ORDER,
+		enabled = true,
+	}
+	local index = find(self, name)
+
+	if index ~= nil then
+		self.stages[index] = stage
+	else
+		self.stages[#self.stages + 1] = stage
+	end
+
+	table.sort(self.stages, compare)
+	self.version += 1
+end
+
+local remove = function(self: Pipeline, name: string): boolean
+	local index = find(self, name)
 
 	if index == nil then
 		return false
 	end
 
 	table.remove(self.stages, index)
+	self.version += 1
 	return true
 end
 
-local function run_stage(stage: Stage, context: any, phase: Phase): ()
-	local ok, err = pcall(stage.callback :: (any, Phase) -> any, context, phase)
-
-	if not ok then
-		warn(string.format("[Bloom.Pipeline] Stage '%s' failed during '%s': %s", stage.name, phase, tostring(err)))
-	end
-end
-
---[=[
-	Creates an empty pipeline.
-
-	@within Pipeline
-	@return Pipeline
-]=]
-pipeline.New = function(): Pipeline
-	return setmetatable({ stages = {} }, pipeline)
-end
-
---[=[
-	Registers a stage, replacing any stage with the same name. Lower `order` values run first.
-
-	@within Pipeline
-	@param name string -- Unique stage name.
-	@param callback (context: Bloom, phase: string) -> ()
-	@param order number? -- Defaults to 100.
-]=]
-pipeline.Register = function(self: Pipeline, name: string, callback: Callback, order: number?): ()
-	assert(type(name) == "string" and name ~= "", "Pipeline.Register expects a non-empty name")
-	assert(type(callback) == "function", "Pipeline.Register expects a callback")
-
-	remove_stage(self, name)
-	table.insert(self.stages, {
-		name = name,
-		callback = callback,
-		order = order or DEFAULT_ORDER,
-		enabled = true,
-	})
-
-	table.sort(self.stages, compare_stages)
-end
-
---[=[
-	Removes a stage by name.
-
-	@within Pipeline
-	@return boolean -- True when a stage was removed.
-]=]
-pipeline.Remove = function(self: Pipeline, name: string): boolean
-	return remove_stage(self, name)
-end
-
---[=[
-	Enables or disables a registered stage.
-
-	@within Pipeline
-	@return boolean -- True when the stage exists.
-]=]
-pipeline.SetEnabled = function(self: Pipeline, name: string, enabled: boolean): boolean
-	local _, stage = find_stage(self, name)
+local set_enabled = function(self: Pipeline, name: string, enabled: boolean): boolean
+	local _, stage = find(self, name)
 
 	if stage == nil then
 		return false
@@ -132,22 +94,52 @@ pipeline.SetEnabled = function(self: Pipeline, name: string, enabled: boolean): 
 	return true
 end
 
---[=[
-	Runs every enabled stage for `phase` in ascending order. A failing stage is reported
-	with `warn` and does not stop the remaining stages.
+local run = function(self: Pipeline, context: any, phase: string): ()
+	local snapshot = self.snapshot
 
-	@within Pipeline
-]=]
-pipeline.Run = function(self: Pipeline, context: any, phase: Phase): ()
-	if #self.stages == 0 then
-		return
+	if self.snapshot_version ~= self.version then
+		snapshot = table.clone(self.stages)
+		self.snapshot = snapshot
+		self.snapshot_version = self.version
 	end
 
-	for _, stage in table.clone(self.stages) do
+	for index = 1, #snapshot do
+		local stage = snapshot[index]
+
 		if stage.enabled then
-			run_stage(stage, context, phase)
+			local ok, err = pcall(stage.callback :: (any, string) -> any, context, phase)
+
+			if not ok then
+				local warn_fn: any = env.warn
+
+				if warn_fn == nil then
+					warn_fn = warn
+				end
+
+				warn_fn(string.format(
+					"[Bloom.Pipeline] Stage '%s' failed during '%s': %s",
+					stage.name,
+					phase,
+					tostring(err)
+				))
+			end
 		end
 	end
 end
 
-return pipeline
+local new = function(): Pipeline
+	return {
+		stages = {},
+		snapshot = {},
+		version = 0,
+		snapshot_version = 0,
+		Register = register,
+		Remove = remove,
+		SetEnabled = set_enabled,
+		Run = run,
+	}
+end
+
+return {
+	new = new,
+}

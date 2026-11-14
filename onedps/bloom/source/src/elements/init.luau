@@ -9,11 +9,14 @@
 	Low-level graphics library for EditableImage
 ]]
 
+--!native
+--!optimize 2
 --!strict
 
 return {
-	Line = require("@self/line"),
-	Pixel = require("@self/pixel"),
-	Rect = require("@self/rect"),
-	Triangle = require("@self/triangle"),
+	Circle = require("./circle"),
+	Line = require("./line"),
+	Pixel = require("./pixel"),
+	Rect = require("./rect"),
+	Triangle = require("./triangle"),
 }
