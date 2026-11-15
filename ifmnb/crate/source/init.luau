@@ -19,7 +19,7 @@
       * `_parent` holds the *instance* of the parent (userdata), not a
         crate; the parent crate is resolved via `crates:get(crate._parent)`.
 ]==]
-export type crate = {
+export type crate <T = any> = {
 	--[==[
         Parent *instance* (userdata), or `nil` for the root crate.
 
@@ -56,7 +56,7 @@ export type crate = {
         `__iter` / `__tostring` access goes through the metatable —
         this very crate.
     ]==]
-	read _instance: any,
+	read _instance: T,
 
 	--[==[
         Whitelist of readable field names. A read through the proxy
